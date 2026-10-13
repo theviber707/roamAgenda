@@ -48,19 +48,17 @@ jobs:
           generate_release_notes: true
 
       - name: Notify F-Droid Repo
-        uses: peter-evans/repository-dispatch@v3
-        if: env.HAS_PAT == 'true'
         env:
-          HAS_PAT: ${{ secrets.FDROID_REPO_PAT != '' }}
-        with:
-          token: ${{ secrets.FDROID_REPO_PAT }}
-          repository: theviber707/fdroid-repo
-          event-type: update-repo
-          client-payload: '{"tag": "${{ github.ref_name }}"}'
-
-      - name: Log Dispatch Notice
-        if: env.HAS_PAT != 'true'
-        env:
-          HAS_PAT: ${{ secrets.FDROID_REPO_PAT != '' }}
+          PAT: ${{ secrets.FDROID_REPO_PAT }}
         run: |
-          echo "Note: Secret FDROID_REPO_PAT is not set. F-Droid repo update will be picked up on its next scheduled poll or manual workflow run."
+          if [ -n "$PAT" ]; then
+            echo "Dispatching update-repo event to theviber707/fdroid-repo..."
+            curl -f -s -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $PAT" \
+              https://api.github.com/repos/theviber707/fdroid-repo/dispatches \
+              -d "{\"event_type\":\"update-repo\",\"client_payload\":{\"tag\":\"${{ github.ref_name }}\"}}"
+            echo "Successfully notified fdroid-repo."
+          else
+            echo "Note: Secret FDROID_REPO_PAT is not set. F-Droid repo update will run on its next scheduled poll or manual workflow run."
+          fi
