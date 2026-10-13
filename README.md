@@ -9,6 +9,24 @@ A minimal, native Android application built with **Kotlin** and **Jetpack Compos
 
 ---
 
+## 📲 Installation
+
+Roam Agenda is available through **The Viber** F-Droid repository:
+
+1. **Repository URL**:
+   ```text
+   https://theviber707.github.io/fdroid-repo/repo
+   ```
+2. **Signing Key Fingerprint (SHA-256)**:
+   ```text
+   02 34 BA 18 CD 1E 75 21 83 A6 C0 B6 F5 36 2D F8 E5 7C 0D BD 35 59 31 E4 DA 47 7A AB 19 26 74 3C
+   ```
+   *(Or scan the QR code on the [Repository Page](https://theviber707.github.io/fdroid-repo/))*.
+
+Standalone APKs are also provided on each [GitHub Release](https://github.com/theviber707/roamAgenda/releases).
+
+---
+
 ## 🎯 Context & Motivation
 
 When managing notes in Emacs using Org Mode and Org-Roam, desktop agenda workflows often use selective filtering. Roam Agenda implements this specific agenda setup for mobile:
