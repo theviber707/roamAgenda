@@ -23,14 +23,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Icon
@@ -38,10 +43,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -133,6 +141,8 @@ fun TaskCard(
     task: RoamTask,
     onMarkDone: (RoamTask) -> Unit,
     onToggleStep: (RoamTask, TaskStep, Boolean) -> Unit = { _, _, _ -> },
+    onClockIn: (RoamTask) -> Unit = {},
+    onClockOut: (RoamTask) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isChecked by remember { mutableStateOf(false) }
@@ -176,15 +186,36 @@ fun TaskCard(
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
-                    // Headline Title
-                    Text(
-                        text = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(task.title),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None
-                        ),
-                        color = colors.contentColor
-                    )
+                    // Headline Title and Clock Action Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(task.title),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None
+                            ),
+                            color = colors.contentColor,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        IconButton(
+                            onClick = {
+                                if (task.isClockedIn) onClockOut(task) else onClockIn(task)
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (task.isClockedIn) Icons.Default.StopCircle else Icons.Default.PlayCircleOutline,
+                                contentDescription = if (task.isClockedIn) "Clock Out" else "Clock In",
+                                tint = if (task.isClockedIn) MaterialTheme.colorScheme.error else colors.badgeContent,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -333,6 +364,76 @@ fun TaskCard(
                                 }
                             }
                         }
+
+                        // Active Clocked In Badge
+                        if (task.isClockedIn) {
+                            var elapsedSecs by remember(task.clockStartTime) {
+                                val initial = task.clockStartTime?.let {
+                                    java.time.Duration.between(it, java.time.LocalDateTime.now()).seconds.coerceAtLeast(0L)
+                                } ?: 0L
+                                mutableLongStateOf(initial)
+                            }
+                            LaunchedEffect(task.clockStartTime) {
+                                task.clockStartTime?.let { startTime ->
+                                    while (true) {
+                                        val now = java.time.LocalDateTime.now()
+                                        elapsedSecs = java.time.Duration.between(startTime, now).seconds.coerceAtLeast(0)
+                                        delay(1000)
+                                    }
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.errorContainer
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Timer,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Clocked in: ${formatElapsedSeconds(elapsedSecs)}",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        } else if (task.totalClockedMinutes > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = formatTotalClockedTime(task.totalClockedMinutes),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // Child checklist steps
@@ -471,5 +572,26 @@ private fun TaskStepRow(
                 }
             }
         }
+    }
+}
+
+fun formatTotalClockedTime(totalMinutes: Long): String {
+    val h = totalMinutes / 60
+    val m = totalMinutes % 60
+    return when {
+        h > 0 && m > 0 -> "${h}h ${m}m"
+        h > 0 -> "${h}h"
+        else -> "${m}m"
+    }
+}
+
+fun formatElapsedSeconds(seconds: Long): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return if (h > 0) {
+        String.format(java.util.Locale.ROOT, "%d:%02d:%02d", h, m, s)
+    } else {
+        String.format(java.util.Locale.ROOT, "%02d:%02d", m, s)
     }
 }

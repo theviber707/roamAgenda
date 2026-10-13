@@ -539,4 +539,149 @@ class RoamAgendaParserTest {
             RoamAgendaParser.formatOrgTitle("Plain title without links")
         )
     }
+
+    @Test
+    fun testParseClockEntries() {
+        val file = tempFolder.newFile("clocking_test.org")
+        file.writeText(
+            """
+            #+title: Work
+            #+filetags: :agenda:
+
+            * TODO [#A] Important feature
+            :LOGBOOK:
+            CLOCK: [2026-10-13 Tue 14:00]
+            CLOCK: [2025-04-11 Fri 16:58]--[2025-04-11 Fri 17:32] =>  0:34
+            CLOCK: [2025-05-05 Mon 18:39]--[2025-05-05 Mon 20:39] =>  2:00
+            :END:
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        assertEquals(1, tasks.size)
+        val task = tasks[0]
+
+        assertTrue(task.isClockedIn)
+        assertEquals(LocalDateTime.of(2026, 10, 13, 14, 0), task.clockStartTime)
+        // 34 minutes + 120 minutes = 154 minutes
+        assertEquals(154L, task.totalClockedMinutes)
+    }
+
+    @Test
+    fun testClockInCreatesLogbookAndOpenClock() {
+        val file = tempFolder.newFile("clock_in_test.org")
+        file.writeText(
+            """
+            #+title: Work
+            #+filetags: :agenda:
+
+            * TODO [#A] Write unit tests
+            <2026-10-13 Tue>
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        val task = tasks[0]
+
+        val fixedNow = LocalDateTime.of(2026, 10, 13, 15, 30)
+        val success = RoamAgendaParser.clockIn(task, fixedNow)
+        assertTrue(success)
+
+        val content = file.readText()
+        assertTrue(content.contains(":LOGBOOK:"))
+        assertTrue(content.contains("CLOCK: [2026-10-13 Tue 15:30]"))
+        assertTrue(content.contains(":END:"))
+
+        val updatedTasks = RoamAgendaParser.parseOrgFile(file)!!
+        assertTrue(updatedTasks[0].isClockedIn)
+        assertEquals(fixedNow, updatedTasks[0].clockStartTime)
+    }
+
+    @Test
+    fun testClockOutClosesRunningClockWithDuration() {
+        val file = tempFolder.newFile("clock_out_test.org")
+        file.writeText(
+            """
+            #+title: Work
+            #+filetags: :agenda:
+
+            * TODO [#A] Write unit tests
+            :LOGBOOK:
+            CLOCK: [2026-10-13 Tue 14:00]
+            :END:
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        val task = tasks[0]
+
+        val fixedNow = LocalDateTime.of(2026, 10, 13, 15, 45) // 1h 45m = 105 mins
+        val success = RoamAgendaParser.clockOut(task, fixedNow)
+        assertTrue(success)
+
+        val content = file.readText()
+        assertTrue(content.contains("CLOCK: [2026-10-13 Tue 14:00]--[2026-10-13 Tue 15:45] =>  1:45"))
+
+        val updatedTasks = RoamAgendaParser.parseOrgFile(file)!!
+        assertEquals(false, updatedTasks[0].isClockedIn)
+        assertEquals(105L, updatedTasks[0].totalClockedMinutes)
+    }
+
+    @Test
+    fun testCancelClockRemovesRunningClock() {
+        val file = tempFolder.newFile("cancel_clock_test.org")
+        file.writeText(
+            """
+            #+title: Work
+            #+filetags: :agenda:
+
+            * TODO [#A] Write unit tests
+            :LOGBOOK:
+            CLOCK: [2026-10-13 Tue 14:00]
+            CLOCK: [2026-10-12 Mon 10:00]--[2026-10-12 Mon 11:00] =>  1:00
+            :END:
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        val task = tasks[0]
+
+        val success = RoamAgendaParser.cancelClock(task)
+        assertTrue(success)
+
+        val content = file.readText()
+        assertEquals(false, content.contains("CLOCK: [2026-10-13 Tue 14:00]"))
+        assertTrue(content.contains("CLOCK: [2026-10-12 Mon 10:00]--[2026-10-12 Mon 11:00] =>  1:00"))
+
+        val updatedTasks = RoamAgendaParser.parseOrgFile(file)!!
+        assertEquals(false, updatedTasks[0].isClockedIn)
+        assertEquals(60L, updatedTasks[0].totalClockedMinutes)
+    }
+
+    @Test
+    fun testMarkTaskDoneClocksOutRunningClock() {
+        val file = tempFolder.newFile("done_clocks_out_test.org")
+        file.writeText(
+            """
+            #+title: Work
+            #+filetags: :agenda:
+
+            * TODO [#A] Task with active clock
+            :LOGBOOK:
+            CLOCK: [2026-10-13 Tue 14:00]
+            :END:
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        val task = tasks[0]
+
+        val fixedNow = LocalDateTime.of(2026, 10, 13, 14, 30)
+        val success = RoamAgendaParser.markTaskDone(task, fixedNow)
+        assertTrue(success)
+
+        val content = file.readText()
+        assertTrue(content.contains("* DONE [#A] Task with active clock"))
+        assertTrue(content.contains("CLOCK: [2026-10-13 Tue 14:00]--[2026-10-13 Tue 14:30] =>  0:30"))
+    }
 }

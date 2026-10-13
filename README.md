@@ -47,6 +47,12 @@ When managing notes in Emacs using Org Mode and Org-Roam, desktop agenda workflo
   - Keyword indicator (`TODO` vs `NEXT`).
   - Scheduled date badges (`📅 Today`, `⚠️ Overdue`, or `📅 Due: <date>`).
   - Repeater indicator (e.g. `🔁 ++1w`, `🔁 +1d`).
+- **Interactive Steps & Checklists**: Mark off checklist items (`- [ ]`) directly on the card with live progress bar and Org headline progress cookie updates (`[1/3]`).
+- **Org Mode Time Clocking (`org-clock`)**:
+  - Clock in / out directly on any task card with active timer.
+  - Persistent active clock banner with live duration and clock cancel support.
+  - Automatically records `CLOCK: [start]--[end] => H:MM` in `:LOGBOOK:`.
+  - Enforces Org Mode single active clock invariant and auto-clocks out on completion.
 - **Due vs. All Filter**: Toggle between actionable tasks (due today, overdue, or unscheduled) and all tasks (including future scheduled dates) via the top bar Calendar icon.
 - **Full Org Mode Recurrence**:
   - Supports cumulative (`+`), catch-up (`++`), and restart (`.+`) repeaters.

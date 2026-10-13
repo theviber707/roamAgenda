@@ -6,8 +6,10 @@
 package com.roamagenda.data
 
 import java.io.File
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -58,6 +60,9 @@ data class TaskStep(
  * @property scheduledTime Parsed scheduled time string (e.g. "11:45"), if any.
  * @property repeater Repeater info if this is a recurring task.
  * @property steps Checklist items/steps belonging to this task.
+ * @property isClockedIn True if an open CLOCK: entry is currently running on this task.
+ * @property clockStartTime The start timestamp of the currently running clock, if any.
+ * @property totalClockedMinutes Cumulative closed clock duration in minutes recorded on this task.
  * @property id Unique identifier based on file path and line number.
  */
 data class RoamTask(
@@ -72,6 +77,9 @@ data class RoamTask(
     val scheduledTime: String? = null,
     val repeater: RepeaterInfo? = null,
     val steps: List<TaskStep> = emptyList(),
+    val isClockedIn: Boolean = false,
+    val clockStartTime: LocalDateTime? = null,
+    val totalClockedMinutes: Long = 0L,
     val id: String = "$filePath:$lineNumber"
 )
 
@@ -148,6 +156,22 @@ object RoamAgendaParser {
      * Group 1: Extracted time (HH:MM), if present
      */
     val STEP_TIMESTAMP_REGEX = Regex("""<(?:\d{4}-\d{2}-\d{2})?(?:\s+[A-Za-z]+)?(?:\s+(\d{1,2}:\d{2}))?[^>]*>""")
+
+    /**
+     * Matches an open, currently running Org Mode clock line:
+     * `CLOCK: [2026-10-13 Tue 12:00]`
+     */
+    val OPEN_CLOCK_REGEX = Regex(
+        """^\s*CLOCK:\s*\[(\d{4}-\d{2}-\d{2})\s+[^\d\]]+\s+(\d{1,2}:\d{2})\]\s*$"""
+    )
+
+    /**
+     * Matches a closed Org Mode clock entry:
+     * `CLOCK: [2025-04-11 Fri 16:58]--[2025-04-11 Fri 17:32] =>  0:34`
+     */
+    val CLOSED_CLOCK_REGEX = Regex(
+        """^\s*CLOCK:\s*\[(\d{4}-\d{2}-\d{2})\s+[^\d\]]+\s+(\d{1,2}:\d{2})\]--\[(\d{4}-\d{2}-\d{2})\s+[^\d\]]+\s+(\d{1,2}:\d{2})\]\s*=>\s*(\d+):(\d{2})"""
+    )
 
     /**
      * Formats an Org headline title for user display by unwrapping Org Mode links:
@@ -263,11 +287,14 @@ object RoamAgendaParser {
             val priority = match.groupValues[3].firstOrNull() ?: continue
             val title = match.groupValues[4].trim()
 
-            // Look ahead for planning info and checklist steps under this headline
+            // Look ahead for planning info, checklist steps, and clock entries under this headline
             var scheduledDate: LocalDate? = null
             var scheduledTime: String? = null
             var repeaterInfo: RepeaterInfo? = null
             val steps = mutableListOf<TaskStep>()
+            var isClockedIn = false
+            var clockStartTime: LocalDateTime? = null
+            var totalClockedMinutes = 0L
 
             var inDrawer = false
             var lookahead = index + 1
@@ -280,6 +307,31 @@ object RoamAgendaParser {
                     inDrawer = false
                 } else if (trimmedNext.startsWith(":") && trimmedNext.endsWith(":") && trimmedNext.length > 2) {
                     inDrawer = true
+                }
+
+                // Check for clock entries
+                val openClockMatch = OPEN_CLOCK_REGEX.find(nextLine)
+                if (openClockMatch != null) {
+                    try {
+                        val dStr = openClockMatch.groupValues[1]
+                        val tStr = openClockMatch.groupValues[2]
+                        val paddedTimeStr = if (tStr.length == 4) "0$tStr" else tStr
+                        clockStartTime = LocalDateTime.of(LocalDate.parse(dStr), LocalTime.parse(paddedTimeStr))
+                        isClockedIn = true
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                } else {
+                    val closedClockMatch = CLOSED_CLOCK_REGEX.find(nextLine)
+                    if (closedClockMatch != null) {
+                        try {
+                            val hours = closedClockMatch.groupValues[5].toLong()
+                            val minutes = closedClockMatch.groupValues[6].toLong()
+                            totalClockedMinutes += (hours * 60 + minutes)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
                 }
 
                 // Check for planning / active timestamp line (if not already found)
@@ -348,7 +400,10 @@ object RoamAgendaParser {
                     scheduledDate = scheduledDate,
                     scheduledTime = scheduledTime,
                     repeater = repeaterInfo,
-                    steps = steps
+                    steps = steps,
+                    isClockedIn = isClockedIn,
+                    clockStartTime = clockStartTime,
+                    totalClockedMinutes = totalClockedMinutes
                 )
             )
         }
@@ -363,6 +418,9 @@ object RoamAgendaParser {
      * - If normal, replaces `TODO` or `NEXT` with `DONE` in-place.
      */
     fun markTaskDone(task: RoamTask, now: LocalDateTime = LocalDateTime.now()): Boolean {
+        // If this task has an active clock, clock it out first (org-clock-out-when-done)
+        clockOut(task, now)
+
         return if (task.repeater != null && task.scheduledDate != null) {
             markRepeatingTaskDone(task, now)
         } else {
@@ -678,6 +736,241 @@ object RoamAgendaParser {
             'm' -> date.plusMonths(value)
             'y' -> date.plusYears(value)
             else -> date.plusDays(value)
+        }
+    }
+
+    /**
+     * Clocks in to [task] by appending a new active `CLOCK: [YYYY-MM-DD Day HH:MM]`
+     * entry at the top of the task's `:LOGBOOK:` drawer.
+     */
+    fun clockIn(
+        task: RoamTask,
+        now: LocalDateTime = LocalDateTime.now()
+    ): Boolean {
+        val file = File(task.filePath)
+        if (!file.exists() || !file.isFile) return false
+
+        return try {
+            val rawText = file.readText(Charsets.UTF_8)
+            val lineEnding = if (rawText.contains("\r\n")) "\r\n" else "\n"
+            val endsWithNewline = rawText.endsWith("\n") || rawText.endsWith("\r\n")
+
+            val lines = rawText.split(Regex("""\r\n|\r|\n""")).toMutableList()
+            if (endsWithNewline && lines.isNotEmpty() && lines.last().isEmpty()) {
+                lines.removeAt(lines.lastIndex)
+            }
+
+            val targetIndex = task.lineNumber - 1
+            val headlineIndex = if (targetIndex in lines.indices && isMatchingTaskLine(lines[targetIndex], task)) {
+                targetIndex
+            } else {
+                lines.indexOfFirst { isMatchingTaskLine(it, task) }
+            }
+
+            if (headlineIndex == -1) return false
+
+            var nextHeadlineIndex = lines.size
+            for (i in (headlineIndex + 1) until lines.size) {
+                if (lines[i].trim().startsWith("*")) {
+                    nextHeadlineIndex = i
+                    break
+                }
+            }
+
+            // Check if there is already an open clock under this headline
+            for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                if (OPEN_CLOCK_REGEX.containsMatchIn(lines[i])) {
+                    return true
+                }
+            }
+
+            val dateStr = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val dayStr = now.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+            val timeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
+            val clockLine = "CLOCK: [$dateStr $dayStr $timeStr]"
+
+            // Locate existing :LOGBOOK: drawer
+            var logbookStart = -1
+            for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                if (lines[i].trim().equals(":LOGBOOK:", ignoreCase = true)) {
+                    logbookStart = i
+                    break
+                }
+            }
+
+            if (logbookStart != -1) {
+                val indent = lines[logbookStart].takeWhile { it.isWhitespace() }
+                lines.add(logbookStart + 1, "${indent}$clockLine")
+            } else {
+                // Find insertion point for new :LOGBOOK: drawer
+                var insertAt = -1
+                for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                    if (lines[i].trim().equals(":END:", ignoreCase = true)) {
+                        insertAt = i + 1
+                        break
+                    }
+                }
+                if (insertAt == -1) {
+                    for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                        if (ACTIVE_TIMESTAMP_REGEX.containsMatchIn(lines[i])) {
+                            insertAt = i + 1
+                            break
+                        }
+                    }
+                }
+                if (insertAt == -1) {
+                    insertAt = headlineIndex + 1
+                }
+
+                val indent = lines[headlineIndex].takeWhile { it.isWhitespace() }
+                lines.add(insertAt, "${indent}:LOGBOOK:")
+                lines.add(insertAt + 1, "${indent}$clockLine")
+                lines.add(insertAt + 2, "${indent}:END:")
+            }
+
+            val updatedContent = lines.joinToString(lineEnding) + (if (endsWithNewline) lineEnding else "")
+            file.writeText(updatedContent, Charsets.UTF_8)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Clocks out of [task] by closing any active `CLOCK: [start]` line under the headline
+     * with `--[end] => H:MM`.
+     */
+    fun clockOut(
+        task: RoamTask,
+        now: LocalDateTime = LocalDateTime.now()
+    ): Boolean {
+        val file = File(task.filePath)
+        if (!file.exists() || !file.isFile) return false
+
+        return try {
+            val rawText = file.readText(Charsets.UTF_8)
+            val lineEnding = if (rawText.contains("\r\n")) "\r\n" else "\n"
+            val endsWithNewline = rawText.endsWith("\n") || rawText.endsWith("\r\n")
+
+            val lines = rawText.split(Regex("""\r\n|\r|\n""")).toMutableList()
+            if (endsWithNewline && lines.isNotEmpty() && lines.last().isEmpty()) {
+                lines.removeAt(lines.lastIndex)
+            }
+
+            val targetIndex = task.lineNumber - 1
+            val headlineIndex = if (targetIndex in lines.indices && isMatchingTaskLine(lines[targetIndex], task)) {
+                targetIndex
+            } else {
+                lines.indexOfFirst { isMatchingTaskLine(it, task) }
+            }
+
+            if (headlineIndex == -1) return false
+
+            var nextHeadlineIndex = lines.size
+            for (i in (headlineIndex + 1) until lines.size) {
+                if (lines[i].trim().startsWith("*")) {
+                    nextHeadlineIndex = i
+                    break
+                }
+            }
+
+            var openClockIndex = -1
+            var openMatch: MatchResult? = null
+            for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                val match = OPEN_CLOCK_REGEX.find(lines[i])
+                if (match != null) {
+                    openClockIndex = i
+                    openMatch = match
+                    break
+                }
+            }
+
+            if (openClockIndex == -1 || openMatch == null) return false
+
+            val startDateStr = openMatch.groupValues[1]
+            val startTimeStr = openMatch.groupValues[2]
+            val paddedStartTimeStr = if (startTimeStr.length == 4) "0$startTimeStr" else startTimeStr
+            val startDateTime = LocalDateTime.of(LocalDate.parse(startDateStr), LocalTime.parse(paddedStartTimeStr))
+
+            val duration = Duration.between(startDateTime, now)
+            val totalMinutes = duration.toMinutes().coerceAtLeast(0)
+            val hours = totalMinutes / 60
+            val minutes = totalMinutes % 60
+            val durationStr = String.format(Locale.ROOT, "%2d:%02d", hours, minutes)
+
+            val endDateStr = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val endDayStr = now.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+            val endTimeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
+
+            val indent = lines[openClockIndex].takeWhile { it.isWhitespace() }
+            val rawLine = lines[openClockIndex]
+            val startBracket = rawLine.substringAfter("CLOCK:").trim()
+
+            val closedLine = "${indent}CLOCK: $startBracket--[$endDateStr $endDayStr $endTimeStr] => $durationStr"
+            lines[openClockIndex] = closedLine
+
+            val updatedContent = lines.joinToString(lineEnding) + (if (endsWithNewline) lineEnding else "")
+            file.writeText(updatedContent, Charsets.UTF_8)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Cancels an active clock on [task] by removing the open `CLOCK:` entry without recording duration.
+     */
+    fun cancelClock(task: RoamTask): Boolean {
+        val file = File(task.filePath)
+        if (!file.exists() || !file.isFile) return false
+
+        return try {
+            val rawText = file.readText(Charsets.UTF_8)
+            val lineEnding = if (rawText.contains("\r\n")) "\r\n" else "\n"
+            val endsWithNewline = rawText.endsWith("\n") || rawText.endsWith("\r\n")
+
+            val lines = rawText.split(Regex("""\r\n|\r|\n""")).toMutableList()
+            if (endsWithNewline && lines.isNotEmpty() && lines.last().isEmpty()) {
+                lines.removeAt(lines.lastIndex)
+            }
+
+            val targetIndex = task.lineNumber - 1
+            val headlineIndex = if (targetIndex in lines.indices && isMatchingTaskLine(lines[targetIndex], task)) {
+                targetIndex
+            } else {
+                lines.indexOfFirst { isMatchingTaskLine(it, task) }
+            }
+
+            if (headlineIndex == -1) return false
+
+            var nextHeadlineIndex = lines.size
+            for (i in (headlineIndex + 1) until lines.size) {
+                if (lines[i].trim().startsWith("*")) {
+                    nextHeadlineIndex = i
+                    break
+                }
+            }
+
+            var openClockIndex = -1
+            for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                if (OPEN_CLOCK_REGEX.containsMatchIn(lines[i])) {
+                    openClockIndex = i
+                    break
+                }
+            }
+
+            if (openClockIndex == -1) return false
+
+            lines.removeAt(openClockIndex)
+
+            val updatedContent = lines.joinToString(lineEnding) + (if (endsWithNewline) lineEnding else "")
+            file.writeText(updatedContent, Charsets.UTF_8)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 

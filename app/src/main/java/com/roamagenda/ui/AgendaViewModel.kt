@@ -62,7 +62,8 @@ data class AgendaUiState(
     val totalFilesScanned: Int = 0,
     val agendaFilesCount: Int = 0,
     val error: AgendaError? = null,
-    val lastCompletedRecord: CompletedTaskRecord? = null
+    val lastCompletedRecord: CompletedTaskRecord? = null,
+    val activeClockedTask: RoamTask? = null
 )
 
 /**
@@ -185,6 +186,8 @@ class AgendaViewModel(
                     val visible = filterVisibleTasks(result.tasks, showFuture)
                     val grouped = visible.groupBy { it.priority }.toSortedMap()
 
+                    val activeClocked = result.tasks.firstOrNull { it.isClockedIn }
+
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -194,7 +197,8 @@ class AgendaViewModel(
                             totalTaskCount = visible.size,
                             totalFilesScanned = result.totalFilesScanned,
                             agendaFilesCount = result.agendaFilesFound,
-                            error = null
+                            error = null,
+                            activeClockedTask = activeClocked
                         )
                     }
                 }
@@ -207,7 +211,8 @@ class AgendaViewModel(
                             rawTasks = emptyList(),
                             tasksByPriority = emptyMap(),
                             totalTaskCount = 0,
-                            error = AgendaError.DirectoryNotFound(result.path)
+                            error = AgendaError.DirectoryNotFound(result.path),
+                            activeClockedTask = null
                         )
                     }
                 }
@@ -392,6 +397,69 @@ class AgendaViewModel(
             if (!success) {
                 _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to update step"))
                 refreshTasks(isSilent = true)
+            }
+        }
+    }
+
+    /**
+     * Clocks in to [task]. If another task is currently clocked in, clocks out of it first.
+     */
+    fun clockIn(task: RoamTask) {
+        viewModelScope.launch {
+            val currentlyClocked = _uiState.value.rawTasks.firstOrNull { it.isClockedIn }
+            if (currentlyClocked != null && currentlyClocked.id != task.id) {
+                withContext(Dispatchers.IO) {
+                    RoamAgendaParser.clockOut(currentlyClocked)
+                }
+            }
+
+            val success = withContext(Dispatchers.IO) {
+                RoamAgendaParser.clockIn(task)
+            }
+
+            if (success) {
+                val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Clocked in: $displayTitle"))
+                refreshTasks(isSilent = true)
+            } else {
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to clock in"))
+            }
+        }
+    }
+
+    /**
+     * Clocks out of [task] and saves closed clock duration.
+     */
+    fun clockOut(task: RoamTask) {
+        viewModelScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                RoamAgendaParser.clockOut(task)
+            }
+
+            if (success) {
+                val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Clocked out: $displayTitle"))
+                refreshTasks(isSilent = true)
+            } else {
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to clock out"))
+            }
+        }
+    }
+
+    /**
+     * Cancels an active clock on [task] without recording duration.
+     */
+    fun cancelClock(task: RoamTask) {
+        viewModelScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                RoamAgendaParser.cancelClock(task)
+            }
+
+            if (success) {
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Clock cancelled"))
+                refreshTasks(isSilent = true)
+            } else {
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to cancel clock"))
             }
         }
     }
