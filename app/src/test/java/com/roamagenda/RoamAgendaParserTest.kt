@@ -415,6 +415,112 @@ class RoamAgendaParserTest {
     }
 
     @Test
+    fun testParseTaskWithChecklistSteps() {
+        val file = tempFolder.newFile("checklist_test.org")
+        file.writeText(
+            """
+            #+title: Habits
+            #+filetags: :agenda:
+
+            *** TODO [#B] Brush Teeth [1/5]
+            :PROPERTIES:
+            :LAST_REPEAT: [2026-10-12 Mon 21:00]
+            :END:
+            <2026-10-13 Tue ++1d>
+            - [ ] After waking up <2026-10-13 Tue 07:00>
+            - [ ] After breakfast <2026-10-13 Tue 09:00>
+            - [X] After lunch <2026-10-13 Tue 12:40>
+            - [ ] After snacks <2026-10-13 Tue 16:20>
+            - [ ] After dinner <2026-10-13 Tue 20:40>
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)
+        assertNotNull(tasks)
+        assertEquals(1, tasks!!.size)
+
+        val task = tasks[0]
+        assertEquals(5, task.steps.size)
+
+        val step1 = task.steps[0]
+        assertEquals(false, step1.isChecked)
+        assertEquals("After waking up", step1.text)
+        assertEquals("07:00", step1.time)
+
+        val step3 = task.steps[2]
+        assertEquals(true, step3.isChecked)
+        assertEquals("After lunch", step3.text)
+        assertEquals("12:40", step3.time)
+    }
+
+    @Test
+    fun testToggleTaskStepUpdatesCheckboxAndHeadlineCookie() {
+        val file = tempFolder.newFile("step_toggle.org")
+        file.writeText(
+            """
+            #+title: Habits
+            #+filetags: :agenda:
+
+            *** TODO [#B] Brush Teeth [1/2]
+            <2026-10-13 Tue ++1d>
+            - [ ] After waking up <2026-10-13 Tue 07:00>
+            - [X] After lunch <2026-10-13 Tue 12:40>
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        val task = tasks[0]
+        val step1 = task.steps[0]
+
+        // Toggle first step to checked
+        val success = RoamAgendaParser.toggleTaskStep(task, step1, true)
+        assertTrue(success)
+
+        var content = file.readText()
+        assertTrue(content.contains("- [X] After waking up <2026-10-13 Tue 07:00>"))
+        assertTrue(content.contains("*** TODO [#B] Brush Teeth [2/2]"))
+
+        // Re-parse and toggle second step to unchecked
+        val updatedTasks = RoamAgendaParser.parseOrgFile(file)!!
+        val step2 = updatedTasks[0].steps[1]
+        val success2 = RoamAgendaParser.toggleTaskStep(updatedTasks[0], step2, false)
+        assertTrue(success2)
+
+        content = file.readText()
+        assertTrue(content.contains("- [ ] After lunch <2026-10-13 Tue 12:40>"))
+        assertTrue(content.contains("*** TODO [#B] Brush Teeth [1/2]"))
+    }
+
+    @Test
+    fun testMarkRepeatingTaskResetsCheckboxesAndCookie() {
+        val file = tempFolder.newFile("repeat_reset.org")
+        file.writeText(
+            """
+            #+title: Habits
+            #+filetags: :agenda:
+
+            *** TODO [#B] Brush Teeth [2/2]
+            <2026-10-13 Tue ++1d>
+            - [X] After waking up <2026-10-13 Tue 07:00>
+            - [X] After lunch <2026-10-13 Tue 12:40>
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)!!
+        val task = tasks[0]
+
+        val fixedNow = LocalDateTime.of(2026, 10, 13, 22, 0)
+        val success = RoamAgendaParser.markTaskDone(task, fixedNow)
+        assertTrue(success)
+
+        val content = file.readText()
+        assertTrue(content.contains("*** TODO [#B] Brush Teeth [0/2]"))
+        assertTrue(content.contains("- [ ] After waking up <2026-10-13 Tue 07:00>"))
+        assertTrue(content.contains("- [ ] After lunch <2026-10-13 Tue 12:40>"))
+        assertTrue(content.contains("<2026-10-14 Wed ++1d>"))
+    }
+
+    @Test
     fun testFormatOrgTitleUnwrapsLinks() {
         assertEquals(
             "Nubank Content",

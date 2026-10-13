@@ -14,6 +14,7 @@ import com.roamagenda.data.AgendaPreferences
 import com.roamagenda.data.ParseResult
 import com.roamagenda.data.RoamAgendaParser
 import com.roamagenda.data.RoamTask
+import com.roamagenda.data.TaskStep
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -335,6 +336,62 @@ class AgendaViewModel(
                 refreshTasks(isSilent = true)
             } else {
                 _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to undo task"))
+            }
+        }
+    }
+
+    /**
+     * Toggles the completion state of a child checklist step under [task].
+     * Performs an optimistic update of the UI state, re-calculates the headline
+     * progress cookie, and writes the change to disk.
+     */
+    fun toggleTaskStep(task: RoamTask, step: TaskStep, isChecked: Boolean) {
+        viewModelScope.launch {
+            // Optimistic update
+            val currentRawTasks = _uiState.value.rawTasks
+            val taskIndex = currentRawTasks.indexOfFirst { it.id == task.id }
+            if (taskIndex != -1) {
+                val oldTask = currentRawTasks[taskIndex]
+                val newSteps = oldTask.steps.map { s ->
+                    if (s.lineNumber == step.lineNumber) {
+                        s.copy(isChecked = isChecked)
+                    } else {
+                        s
+                    }
+                }
+                val checkedCount = newSteps.count { it.isChecked }
+                val totalCount = newSteps.size
+                val updatedTitle = oldTask.title
+                    .replaceFirst(Regex("""\[(?:\d+/\d+|/)\]"""), "[$checkedCount/$totalCount]")
+                    .replaceFirst(Regex("""\[(?:\d+%|%)\]"""), "[${if (totalCount > 0) (checkedCount * 100) / totalCount else 0}%]")
+
+                val updatedTask = oldTask.copy(
+                    title = updatedTitle,
+                    steps = newSteps
+                )
+
+                val updatedRawList = currentRawTasks.toMutableList()
+                updatedRawList[taskIndex] = updatedTask
+
+                val showFuture = _uiState.value.showFutureTasks
+                val visible = filterVisibleTasks(updatedRawList, showFuture)
+                val grouped = visible.groupBy { it.priority }.toSortedMap()
+
+                _uiState.update {
+                    it.copy(
+                        rawTasks = updatedRawList,
+                        tasksByPriority = grouped
+                    )
+                }
+            }
+
+            val success = withContext(Dispatchers.IO) {
+                RoamAgendaParser.toggleTaskStep(task, step, isChecked)
+            }
+
+            if (!success) {
+                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to update step"))
+                refreshTasks(isSilent = true)
             }
         }
     }

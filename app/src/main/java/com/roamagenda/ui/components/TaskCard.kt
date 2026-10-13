@@ -20,13 +20,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,8 +49,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.roamagenda.data.RoamTask
+import com.roamagenda.data.TaskStep
 import com.roamagenda.ui.theme.OnPriorityBlueContainerDark
 import com.roamagenda.ui.theme.OnPriorityBlueContainerLight
 import com.roamagenda.ui.theme.OnPriorityGreenContainerDark
@@ -124,6 +132,7 @@ fun getPriorityColorScheme(priority: Char): PriorityColorScheme {
 fun TaskCard(
     task: RoamTask,
     onMarkDone: (RoamTask) -> Unit,
+    onToggleStep: (RoamTask, TaskStep, Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var isChecked by remember { mutableStateOf(false) }
@@ -325,6 +334,140 @@ fun TaskCard(
                             }
                         }
                     }
+
+                    // Child checklist steps
+                    if (task.steps.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        HorizontalDivider(
+                            color = colors.borderColor.copy(alpha = 0.5f),
+                            thickness = 0.5.dp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        val checkedCount = task.steps.count { it.isChecked }
+                        val totalCount = task.steps.size
+                        val progress = if (totalCount > 0) checkedCount.toFloat() / totalCount.toFloat() else 0f
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = colors.badgeContent,
+                                trackColor = colors.badgeContainer.copy(alpha = 0.4f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "$checkedCount of $totalCount",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = colors.contentColor.copy(alpha = 0.7f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            task.steps.forEach { step ->
+                                TaskStepRow(
+                                    step = step,
+                                    colors = colors,
+                                    onToggle = { newChecked ->
+                                        onToggleStep(task, step, newChecked)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskStepRow(
+    step: TaskStep,
+    colors: PriorityColorScheme,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .clickable { onToggle(!step.isChecked) }
+            .padding(vertical = 2.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = step.isChecked,
+            onCheckedChange = { onToggle(it) },
+            colors = CheckboxDefaults.colors(
+                checkedColor = colors.badgeContent,
+                checkmarkColor = MaterialTheme.colorScheme.surface
+            )
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = step.text,
+            style = MaterialTheme.typography.bodySmall.copy(
+                textDecoration = if (step.isChecked) TextDecoration.LineThrough else TextDecoration.None
+            ),
+            color = if (step.isChecked) {
+                colors.contentColor.copy(alpha = 0.5f)
+            } else {
+                colors.contentColor
+            },
+            modifier = Modifier.weight(1f)
+        )
+        if (step.time != null) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = if (step.isChecked) {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(11.dp),
+                        tint = if (step.isChecked) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = step.time,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = if (step.isChecked) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
                 }
             }
         }

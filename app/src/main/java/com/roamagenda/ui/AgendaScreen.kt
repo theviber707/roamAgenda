@@ -240,7 +240,8 @@ fun AgendaScreen(
                                 ) { task ->
                                     TaskCard(
                                         task = task,
-                                        onMarkDone = { viewModel.markTaskDone(it) }
+                                        onMarkDone = { viewModel.markTaskDone(it) },
+                                        onToggleStep = { t, s, checked -> viewModel.toggleTaskStep(t, s, checked) }
                                     )
                                 }
                             }

@@ -28,6 +28,23 @@ data class RepeaterInfo(
 )
 
 /**
+ * Represents a child checklist item / step under an Org headline.
+ *
+ * @property lineNumber 1-based line number of the checklist item in the file.
+ * @property isChecked Whether the step is checked ([X]).
+ * @property text Clean display text (stripped of timestamp and unwrapped org links).
+ * @property time Optional scheduled/target time string (e.g. "07:00") extracted from step timestamp.
+ * @property rawText Full raw line in the file.
+ */
+data class TaskStep(
+    val lineNumber: Int,
+    val isChecked: Boolean,
+    val text: String,
+    val time: String? = null,
+    val rawText: String
+)
+
+/**
  * Represents an agenda item parsed from an Org-Roam file.
  *
  * @property filePath Absolute path to the origin .org file.
@@ -40,6 +57,7 @@ data class RepeaterInfo(
  * @property scheduledDate Parsed scheduled date, if any.
  * @property scheduledTime Parsed scheduled time string (e.g. "11:45"), if any.
  * @property repeater Repeater info if this is a recurring task.
+ * @property steps Checklist items/steps belonging to this task.
  * @property id Unique identifier based on file path and line number.
  */
 data class RoamTask(
@@ -53,6 +71,7 @@ data class RoamTask(
     val scheduledDate: LocalDate? = null,
     val scheduledTime: String? = null,
     val repeater: RepeaterInfo? = null,
+    val steps: List<TaskStep> = emptyList(),
     val id: String = "$filePath:$lineNumber"
 )
 
@@ -115,6 +134,20 @@ object RoamAgendaParser {
      * Backward-compatible alias for [ACTIVE_TIMESTAMP_REGEX].
      */
     val SCHEDULED_REGEX = ACTIVE_TIMESTAMP_REGEX
+
+    /**
+     * Matches Org Mode checklist item lines (e.g. `- [ ] Item`, `- [X] Done item`).
+     * Group 1: Bullet marker with indent (e.g. `-`, `+`, `*`)
+     * Group 2: Check state character (` ` for unchecked, `X` or `x` for checked, `-` for intermediate)
+     * Group 3: Item content/description
+     */
+    val CHECKLIST_REGEX = Regex("""^(\s*[-+*])\s+\[([ Xx-])\]\s+(.*)""")
+
+    /**
+     * Matches inline timestamps inside step items (e.g. `<2026-10-13 Tue 07:00>` or `<07:00>`).
+     * Group 1: Extracted time (HH:MM), if present
+     */
+    val STEP_TIMESTAMP_REGEX = Regex("""<(?:\d{4}-\d{2}-\d{2})?(?:\s+[A-Za-z]+)?(?:\s+(\d{1,2}:\d{2}))?[^>]*>""")
 
     /**
      * Formats an Org headline title for user display by unwrapping Org Mode links:
@@ -230,48 +263,76 @@ object RoamAgendaParser {
             val priority = match.groupValues[3].firstOrNull() ?: continue
             val title = match.groupValues[4].trim()
 
-            // Look ahead for SCHEDULED planning info under this headline
+            // Look ahead for planning info and checklist steps under this headline
             var scheduledDate: LocalDate? = null
             var scheduledTime: String? = null
             var repeaterInfo: RepeaterInfo? = null
+            val steps = mutableListOf<TaskStep>()
 
+            var inDrawer = false
             var lookahead = index + 1
             while (lookahead < lines.size) {
                 val nextLine = lines[lookahead]
                 val trimmedNext = nextLine.trim()
                 if (trimmedNext.startsWith("*")) break // Reached next headline
 
-                val schedMatch = SCHEDULED_REGEX.find(nextLine)
-                if (schedMatch != null) {
-                    try {
-                        val dateStr = schedMatch.groupValues[1]
-                        scheduledDate = LocalDate.parse(dateStr)
-                        val timeStr = schedMatch.groupValues[2].takeIf { it.isNotEmpty() }
-                        scheduledTime = timeStr
+                if (trimmedNext.equals(":END:", ignoreCase = true)) {
+                    inDrawer = false
+                } else if (trimmedNext.startsWith(":") && trimmedNext.endsWith(":") && trimmedNext.length > 2) {
+                    inDrawer = true
+                }
 
-                        val repType = schedMatch.groupValues[3]
-                        val repVal = schedMatch.groupValues[4]
-                        val repUnit = schedMatch.groupValues[5]
-                        if (repType.isNotEmpty() && repVal.isNotEmpty() && repUnit.isNotEmpty()) {
-                            repeaterInfo = RepeaterInfo(
-                                type = repType,
-                                value = repVal.toLong(),
-                                unit = repUnit.first(),
-                                raw = "$repType$repVal$repUnit"
-                            )
+                // Check for planning / active timestamp line (if not already found)
+                if (scheduledDate == null) {
+                    val schedMatch = ACTIVE_TIMESTAMP_REGEX.find(nextLine)
+                    if (schedMatch != null) {
+                        try {
+                            val dateStr = schedMatch.groupValues[1]
+                            scheduledDate = LocalDate.parse(dateStr)
+                            val timeStr = schedMatch.groupValues[2].takeIf { it.isNotEmpty() }
+                            scheduledTime = timeStr
+
+                            val repType = schedMatch.groupValues[3]
+                            val repVal = schedMatch.groupValues[4]
+                            val repUnit = schedMatch.groupValues[5]
+                            if (repType.isNotEmpty() && repVal.isNotEmpty() && repUnit.isNotEmpty()) {
+                                repeaterInfo = RepeaterInfo(
+                                    type = repType,
+                                    value = repVal.toLong(),
+                                    unit = repUnit.first(),
+                                    raw = "$repType$repVal$repUnit"
+                                )
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
-                    break
                 }
 
-                // Stop scanning if content/body begins before planning line
-                if (trimmedNext.isNotEmpty() && !trimmedNext.startsWith(":") &&
-                    !trimmedNext.startsWith("<") &&
-                    !trimmedNext.startsWith("SCHEDULED") && !trimmedNext.startsWith("DEADLINE") && !trimmedNext.startsWith("CLOSED")) {
-                    break
+                // Check for checklist items (outside drawers)
+                if (!inDrawer) {
+                    val chkMatch = CHECKLIST_REGEX.find(nextLine)
+                    if (chkMatch != null) {
+                        val state = chkMatch.groupValues[2]
+                        val isChecked = state.equals("X", ignoreCase = true)
+                        val rawContent = chkMatch.groupValues[3].trim()
+
+                        val timeMatch = STEP_TIMESTAMP_REGEX.find(rawContent)
+                        val stepTime = timeMatch?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
+                        val cleanText = formatOrgTitle(rawContent.replace(STEP_TIMESTAMP_REGEX, "").trim())
+
+                        steps.add(
+                            TaskStep(
+                                lineNumber = lookahead + 1,
+                                isChecked = isChecked,
+                                text = cleanText,
+                                time = stepTime,
+                                rawText = nextLine
+                            )
+                        )
+                    }
                 }
+
                 lookahead++
             }
 
@@ -286,7 +347,8 @@ object RoamAgendaParser {
                     stars = stars,
                     scheduledDate = scheduledDate,
                     scheduledTime = scheduledTime,
-                    repeater = repeaterInfo
+                    repeater = repeaterInfo,
+                    steps = steps
                 )
             )
         }
@@ -451,6 +513,129 @@ object RoamAgendaParser {
                 lines.add(insertLogbookAt + 2, ":END:")
             }
 
+            // 4. Reset child checklist items to unchecked for next repeating cycle
+            var currentNextHeadline = lines.size
+            for (i in (headlineIndex + 1) until lines.size) {
+                if (lines[i].trim().startsWith("*")) {
+                    currentNextHeadline = i
+                    break
+                }
+            }
+
+            var totalSteps = 0
+            for (i in (headlineIndex + 1) until currentNextHeadline) {
+                if (CHECKLIST_REGEX.containsMatchIn(lines[i])) {
+                    totalSteps++
+                    lines[i] = lines[i].replaceFirst(Regex("""\[[Xx-]\]"""), "[ ]")
+                }
+            }
+            if (totalSteps > 0) {
+                lines[headlineIndex] = lines[headlineIndex]
+                    .replaceFirst(Regex("""\[(?:\d+/\d+|/)\]"""), "[0/$totalSteps]")
+                    .replaceFirst(Regex("""\[(?:\d+%|%)\]"""), "[0%]")
+            }
+
+            val updatedContent = lines.joinToString(lineEnding) + (if (endsWithNewline) lineEnding else "")
+            file.writeText(updatedContent, Charsets.UTF_8)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Toggles the completion state of a child checklist item / step under [task].
+     *
+     * 1. Updates `[ ]` to `[X]` (or vice versa) on the step line in [task.filePath].
+     * 2. Recalculates and updates the headline's progress cookie (e.g. `[1/5]` -> `[2/5]`).
+     *
+     * @return true if successfully modified on disk, false otherwise.
+     */
+    fun toggleTaskStep(
+        task: RoamTask,
+        step: TaskStep,
+        newChecked: Boolean
+    ): Boolean {
+        val file = File(task.filePath)
+        if (!file.exists() || !file.isFile) return false
+
+        return try {
+            val rawText = file.readText(Charsets.UTF_8)
+            val lineEnding = if (rawText.contains("\r\n")) "\r\n" else "\n"
+            val endsWithNewline = rawText.endsWith("\n") || rawText.endsWith("\r\n")
+
+            val lines = rawText.split(Regex("""\r\n|\r|\n""")).toMutableList()
+            if (endsWithNewline && lines.isNotEmpty() && lines.last().isEmpty()) {
+                lines.removeAt(lines.lastIndex)
+            }
+
+            // Find parent headline first
+            val headlineTargetIndex = task.lineNumber - 1
+            val headlineIndex = if (headlineTargetIndex in lines.indices && isMatchingTaskLine(lines[headlineTargetIndex], task)) {
+                headlineTargetIndex
+            } else {
+                lines.indexOfFirst { isMatchingTaskLine(it, task) }
+            }
+
+            var nextHeadlineIndex = lines.size
+            if (headlineIndex != -1) {
+                for (i in (headlineIndex + 1) until lines.size) {
+                    if (lines[i].trim().startsWith("*")) {
+                        nextHeadlineIndex = i
+                        break
+                    }
+                }
+            }
+
+            // Locate the step line
+            val targetIndex = step.lineNumber - 1
+            val stepLineIndex = if (targetIndex in (headlineIndex + 1) until nextHeadlineIndex &&
+                (lines[targetIndex] == step.rawText || (CHECKLIST_REGEX.containsMatchIn(lines[targetIndex]) && lines[targetIndex].contains(step.text)))
+            ) {
+                targetIndex
+            } else {
+                val searchRange = if (headlineIndex != -1) (headlineIndex + 1) until nextHeadlineIndex else lines.indices
+                searchRange.firstOrNull { i ->
+                    val line = lines[i]
+                    CHECKLIST_REGEX.containsMatchIn(line) && line.contains(step.text)
+                } ?: -1
+            }
+
+            if (stepLineIndex == -1) return false
+
+            val currentLine = lines[stepLineIndex]
+            val updatedStepLine = if (newChecked) {
+                currentLine.replaceFirst(Regex("""\[[ -]\]"""), "[X]")
+            } else {
+                currentLine.replaceFirst(Regex("""\[[Xx-]\]"""), "[ ]")
+            }
+            lines[stepLineIndex] = updatedStepLine
+
+            // Recalculate progress cookie on headline if present
+            if (headlineIndex != -1) {
+                var totalSteps = 0
+                var checkedSteps = 0
+                for (i in (headlineIndex + 1) until nextHeadlineIndex) {
+                    val m = CHECKLIST_REGEX.find(lines[i])
+                    if (m != null) {
+                        totalSteps++
+                        val st = m.groupValues[2]
+                        if (st.equals("X", ignoreCase = true)) {
+                            checkedSteps++
+                        }
+                    }
+                }
+
+                if (totalSteps > 0) {
+                    val headline = lines[headlineIndex]
+                    val updatedHeadline = headline
+                        .replaceFirst(Regex("""\[(?:\d+/\d+|/)\]"""), "[$checkedSteps/$totalSteps]")
+                        .replaceFirst(Regex("""\[(?:\d+%|%)\]"""), "[${(checkedSteps * 100) / totalSteps}%]")
+                    lines[headlineIndex] = updatedHeadline
+                }
+            }
+
             val updatedContent = lines.joinToString(lineEnding) + (if (endsWithNewline) lineEnding else "")
             file.writeText(updatedContent, Charsets.UTF_8)
             true
@@ -545,6 +730,8 @@ object RoamAgendaParser {
         val match = HEADLINE_REGEX.find(line) ?: return false
         val priority = match.groupValues[3].firstOrNull() ?: return false
         val title = match.groupValues[4].trim()
-        return priority == task.priority && title == task.title.trim()
+        val cleanCurrent = title.replace(Regex("""\[(?:\d+/\d+|\d+%|/|%)\]"""), "").trim()
+        val cleanTask = task.title.replace(Regex("""\[(?:\d+/\d+|\d+%|/|%)\]"""), "").trim()
+        return priority == task.priority && cleanCurrent == cleanTask
     }
 }
