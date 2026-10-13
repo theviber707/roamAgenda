@@ -1,0 +1,66 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Prepare APK for Release
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::No APK found in release output directory!"
+            exit 1
+          fi
+          RELEASE_APK="app/build/outputs/apk/release/roamAgenda-${{ github.ref_name }}.apk"
+          cp "$APK_PATH" "$RELEASE_APK"
+          echo "RELEASE_APK=$RELEASE_APK" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.RELEASE_APK }}
+          name: Roam Agenda ${{ github.ref_name }}
+          generate_release_notes: true
+
+      - name: Notify F-Droid Repo
+        uses: peter-evans/repository-dispatch@v3
+        if: env.HAS_PAT == 'true'
+        env:
+          HAS_PAT: ${{ secrets.FDROID_REPO_PAT != '' }}
+        with:
+          token: ${{ secrets.FDROID_REPO_PAT }}
+          repository: theviber707/fdroid-repo
+          event-type: update-repo
+          client-payload: '{"tag": "${{ github.ref_name }}"}'
+
+      - name: Log Dispatch Notice
+        if: env.HAS_PAT != 'true'
+        env:
+          HAS_PAT: ${{ secrets.FDROID_REPO_PAT != '' }}
+        run: |
+          echo "Note: Secret FDROID_REPO_PAT is not set. F-Droid repo update will be picked up on its next scheduled poll or manual workflow run."
