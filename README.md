@@ -52,42 +52,6 @@ When managing notes in Emacs using Org Mode and Org-Roam, desktop agenda workflo
 
 ---
 
-## 📂 Project Structure
-
-```
-roamAgenda/
-├── app/
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── AndroidManifest.xml
-│   │   │   └── java/com/roamagenda/
-│   │   │       ├── MainActivity.kt              # App entry point & lifecycle observer
-│   │   │       ├── data/
-│   │   │       │   ├── AgendaPreferences.kt     # DataStore path configuration
-│   │   │       │   └── RoamAgendaParser.kt      # Org scanning, regex parsing, repeaters
-│   │   │       └── ui/
-│   │   │           ├── AgendaViewModel.kt       # StateFlow, IO dispatching, undo logic
-│   │   │           ├── AgendaScreen.kt          # Scaffold, LazyColumn, TopAppBar
-│   │   │           ├── components/
-│   │   │           │   ├── DirectoryDialog.kt   # Directory configuration dialog
-│   │   │           │   ├── PermissionPrompt.kt  # MANAGE_EXTERNAL_STORAGE prompt
-│   │   │           │   ├── PriorityHeader.kt    # Section headers for [#A], [#B], [#C]
-│   │   │           │   └── TaskCard.kt          # Material 3 task card with badges
-│   │   │           └── theme/                   # Material 3 colors, type, and theme
-│   │   └── test/
-│   │       └── java/com/roamagenda/
-│   │           └── RoamAgendaParserTest.kt      # Comprehensive parser & repeater tests
-│   └── build.gradle.kts
-├── flake.nix                                    # Nix environment (SDK 34/35, JDK 21, tools)
-├── scripts/
-│   ├── run-avd.sh                               # Launch Android emulator (test-device)
-│   └── create-avd.sh                            # Create AVD from system images
-├── build.gradle.kts
-└── settings.gradle.kts
-```
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
