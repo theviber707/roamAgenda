@@ -169,7 +169,7 @@ fun TaskCard(
                 ) {
                     // Headline Title
                     Text(
-                        text = task.title,
+                        text = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(task.title),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                             textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None

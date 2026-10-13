@@ -97,20 +97,42 @@ object RoamAgendaParser {
     val HEADLINE_REGEX = Regex("""^(\s*\*+)\s+(TODO|NEXT)\s+\[#([A-Z])\]\s+(.*)""")
 
     /**
-     * Matches SCHEDULED line with date, optional day/time, and optional repeater.
+     * Matches active planning or timestamp line (SCHEDULED:, DEADLINE:, or bare active timestamp).
      * Group 1: Date (YYYY-MM-DD)
      * Group 2: Time (HH:MM), optional
      * Group 3: Repeater type (+, ++, .+)
      * Group 4: Repeater value (digits)
      * Group 5: Repeater unit (h, d, w, m, y)
+     *
+     * Inactive timestamps using square brackets `[...]` are strictly excluded, as they
+     * do not produce agenda items in Org Mode.
      */
-    val SCHEDULED_REGEX = Regex(
-        """SCHEDULED:\s*<(\d{4}-\d{2}-\d{2})(?:\s+[A-Za-z]+)?(?:\s+(\d{1,2}:\d{2}))?(?:\s*(\+\+|\+|\.\+)(\d+)([hdwmy]))?[^>]*>"""
+    val ACTIVE_TIMESTAMP_REGEX = Regex(
+        """^\s*(?:(?:SCHEDULED|DEADLINE):\s*<|<)(\d{4}-\d{2}-\d{2})(?:\s+[A-Za-z]+)?(?:\s+(\d{1,2}:\d{2}))?(?:\s*(\+\+|\+|\.\+)(\d+)([hdwmy]))?[^>]*>"""
     )
+
+    /**
+     * Backward-compatible alias for [ACTIVE_TIMESTAMP_REGEX].
+     */
+    val SCHEDULED_REGEX = ACTIVE_TIMESTAMP_REGEX
+
+    /**
+     * Formats an Org headline title for user display by unwrapping Org Mode links:
+     * `[[url][description]]` -> `description`
+     * `[[url]]` -> `url`
+     */
+    fun formatOrgTitle(title: String): String {
+        return title
+            .replace(Regex("""\[\[[^\]]+\]\[([^\]]+)\]\]""")) { it.groupValues[1] }
+            .replace(Regex("""\[\[([^\]]+)\]\]""")) { it.groupValues[1] }
+    }
 
     /**
      * Recursively traverses [rootDir] for `.org` files, filters those with `:agenda:` filetag,
      * and extracts all prioritized TODO/NEXT tasks.
+     *
+     * Automatically skips hidden directories (e.g. `.stversions`, `.git`, `.stfolder`),
+     * hidden files, Syncthing sync-conflict files, Org archive files, and editor backups.
      */
     fun scanDirectory(rootDir: File): ParseResult {
         if (!rootDir.exists()) {
@@ -122,7 +144,16 @@ object RoamAgendaParser {
 
         return try {
             val orgFiles = rootDir.walkTopDown()
-                .filter { it.isFile && it.extension.equals("org", ignoreCase = true) }
+                .onEnter { dir -> !dir.name.startsWith(".") }
+                .filter { file ->
+                    file.isFile &&
+                    !file.name.startsWith(".") &&
+                    !file.name.startsWith("#") &&
+                    !file.name.endsWith("~") &&
+                    !file.name.contains(".sync-conflict-") &&
+                    !file.name.endsWith(".org_archive", ignoreCase = true) &&
+                    file.extension.equals("org", ignoreCase = true)
+                }
                 .toList()
 
             if (orgFiles.isEmpty()) {
@@ -237,6 +268,7 @@ object RoamAgendaParser {
 
                 // Stop scanning if content/body begins before planning line
                 if (trimmedNext.isNotEmpty() && !trimmedNext.startsWith(":") &&
+                    !trimmedNext.startsWith("<") &&
                     !trimmedNext.startsWith("SCHEDULED") && !trimmedNext.startsWith("DEADLINE") && !trimmedNext.startsWith("CLOSED")) {
                     break
                 }
@@ -330,13 +362,15 @@ object RoamAgendaParser {
             // 1. Advance SCHEDULED date line
             var scheduledLineIndex = -1
             for (i in (headlineIndex + 1) until nextHeadlineIndex) {
-                if (SCHEDULED_REGEX.containsMatchIn(lines[i])) {
+                if (ACTIVE_TIMESTAMP_REGEX.containsMatchIn(lines[i])) {
                     scheduledLineIndex = i
-                    val updatedLine = lines[i].replaceFirst(
-                        SCHEDULED_REGEX,
-                        "SCHEDULED: $nextScheduledTag"
-                    )
-                    lines[i] = updatedLine
+                    val indent = lines[i].takeWhile { it.isWhitespace() }
+                    val prefix = when {
+                        lines[i].contains("SCHEDULED:") -> "SCHEDULED: "
+                        lines[i].contains("DEADLINE:") -> "DEADLINE: "
+                        else -> ""
+                    }
+                    lines[i] = "$indent$prefix$nextScheduledTag"
                     break
                 }
             }

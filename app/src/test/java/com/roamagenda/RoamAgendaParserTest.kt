@@ -273,4 +273,164 @@ class RoamAgendaParserTest {
         assertEquals(3, success.totalFilesScanned)
         assertEquals(2, success.agendaFilesFound)
     }
+
+    @Test
+    fun testScanDirectorySkipsHiddenDirectoriesAndConflictFiles() {
+        val root = tempFolder.newFolder("org_roam")
+
+        // 1. Valid agenda file
+        val validFile = File(root, "valid.org")
+        validFile.writeText(
+            """
+            #+title: Valid Note
+            #+filetags: :agenda:
+            * TODO [#A] Valid Task
+            SCHEDULED: <2026-10-13 Tue>
+            """.trimIndent()
+        )
+
+        // 2. Syncthing .stversions directory
+        val stversionsDir = File(root, ".stversions").apply { mkdirs() }
+        File(stversionsDir, "valid~20261010-090235.org").writeText(
+            """
+            #+title: Old Version
+            #+filetags: :agenda:
+            * TODO [#A] Duplicate Old Task
+            SCHEDULED: <2026-10-10 Sat>
+            """.trimIndent()
+        )
+
+        // 3. Git directory
+        val gitDir = File(root, ".git").apply { mkdirs() }
+        File(gitDir, "ignored.org").writeText(
+            """
+            #+filetags: :agenda:
+            * TODO [#A] Git Ignored
+            """.trimIndent()
+        )
+
+        // 4. Syncthing conflict file
+        File(root, "valid.sync-conflict-20261012-120000-ABCDEF.org").writeText(
+            """
+            #+filetags: :agenda:
+            * TODO [#A] Conflict Duplicate
+            """.trimIndent()
+        )
+
+        // 5. Emacs backup file and auto-save
+        File(root, "valid.org~").writeText(
+            """
+            #+filetags: :agenda:
+            * TODO [#A] Backup Duplicate
+            """.trimIndent()
+        )
+        File(root, "#valid.org#").writeText(
+            """
+            #+filetags: :agenda:
+            * TODO [#A] Auto-save Duplicate
+            """.trimIndent()
+        )
+
+        // 6. Org-mode archive file
+        File(root, "valid.org_archive").writeText(
+            """
+            #+filetags: :agenda:
+            * TODO [#A] Archived Task
+            """.trimIndent()
+        )
+
+        val result = RoamAgendaParser.scanDirectory(root)
+        assertTrue(result is ParseResult.Success)
+        val success = result as ParseResult.Success
+        assertEquals(1, success.totalFilesScanned)
+        assertEquals(1, success.agendaFilesFound)
+        assertEquals(1, success.tasks.size)
+        assertEquals("Valid Task", success.tasks[0].title)
+    }
+
+    @Test
+    fun testInactiveTimestampDoesNotCreateScheduledDate() {
+        val file = tempFolder.newFile("disabled.org")
+        file.writeText(
+            """
+            #+title: Disabled Tasks
+            #+filetags: :agenda:
+
+            * TODO [#A] Research into the current FSF distribution method [2/7]
+            SCHEDULED: [2025-06-23 Mon +1w]
+            :PROPERTIES:
+            :LAST_REPEAT: [2025-05-05 Mon 23:33]
+            :END:
+
+            * TODO [#A] Watch Nubank Content
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)
+        assertNotNull(tasks)
+        assertEquals(2, tasks!!.size)
+
+        // Both tasks must have scheduledDate == null
+        assertNull("Inactive bracket timestamp must not count as active schedule", tasks[0].scheduledDate)
+        assertNull("Inactive bracket repeater must not be parsed", tasks[0].repeater)
+        assertNull("Unscheduled task must have null scheduledDate", tasks[1].scheduledDate)
+    }
+
+    @Test
+    fun testBareActiveTimestampIsParsed() {
+        val file = tempFolder.newFile("brush_teeth.org")
+        file.writeText(
+            """
+            #+title: Habits
+            #+filetags: :agenda:
+
+            *** TODO [#B] Brush Teeth [1/5]
+            :PROPERTIES:
+            :LAST_REPEAT: [2026-10-12 Mon 21:00]
+            :END:
+            <2026-10-13 Tue ++1d>
+            - [ ] After waking up <2026-10-13 Tue 07:00>
+            - [X] After lunch <2026-10-13 Tue 12:40>
+            """.trimIndent()
+        )
+
+        val tasks = RoamAgendaParser.parseOrgFile(file)
+        assertNotNull(tasks)
+        assertEquals(1, tasks!!.size)
+
+        val task = tasks[0]
+        assertEquals(LocalDate.of(2026, 10, 13), task.scheduledDate)
+        assertNotNull(task.repeater)
+        assertEquals("++1d", task.repeater?.raw)
+
+        // Advance task
+        val fixedNow = LocalDateTime.of(2026, 10, 13, 21, 0)
+        val success = RoamAgendaParser.markTaskDone(task, fixedNow)
+        assertTrue(success)
+
+        val content = file.readText()
+        // Bare timestamp should advance without prepending SCHEDULED:
+        assertTrue(content.contains("<2026-10-14 Wed ++1d>"))
+        assertTrue(!content.contains("SCHEDULED: <2026-10-14"))
+    }
+
+    @Test
+    fun testFormatOrgTitleUnwrapsLinks() {
+        assertEquals(
+            "Nubank Content",
+            RoamAgendaParser.formatOrgTitle("[[https://www.youtube.com/@building.nubank/playlists][Nubank Content]]")
+        )
+        assertEquals(
+            "Watch Nubank Content",
+            RoamAgendaParser.formatOrgTitle("Watch [[https://www.youtube.com/@building.nubank/playlists][Nubank Content]]")
+        )
+        assertEquals(
+            "https://go.dev",
+            RoamAgendaParser.formatOrgTitle("[[https://go.dev]]")
+        )
+        assertEquals(
+            "Plain title without links",
+            RoamAgendaParser.formatOrgTitle("Plain title without links")
+        )
+    }
 }

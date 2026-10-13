@@ -147,9 +147,12 @@ class AgendaViewModel(
     }
 
     private fun filterVisibleTasks(tasks: List<RoamTask>, showFuture: Boolean): List<RoamTask> {
-        if (showFuture) return tasks
         val today = LocalDate.now()
-        return tasks.filter { it.scheduledDate == null || !it.scheduledDate.isAfter(today) }
+        return if (showFuture) {
+            tasks.filter { it.scheduledDate != null }
+        } else {
+            tasks.filter { it.scheduledDate != null && !it.scheduledDate.isAfter(today) }
+        }
     }
 
     /**

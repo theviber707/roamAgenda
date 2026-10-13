@@ -83,8 +83,9 @@ fun AgendaScreen(
         viewModel.uiEvents.collect { event ->
             when (event) {
                 is AgendaUiEvent.TaskCompleted -> {
+                    val displayTitle = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(event.task.title)
                     val result = snackbarHostState.showSnackbar(
-                        message = "Completed: ${event.task.title}",
+                        message = "Completed: $displayTitle",
                         actionLabel = "Undo",
                         duration = SnackbarDuration.Short
                     )
@@ -93,8 +94,9 @@ fun AgendaScreen(
                     }
                 }
                 is AgendaUiEvent.TaskUndone -> {
+                    val displayTitle = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(event.task.title)
                     snackbarHostState.showSnackbar(
-                        message = "Restored: ${event.task.title}",
+                        message = "Restored: $displayTitle",
                         duration = SnackbarDuration.Short
                     )
                 }
