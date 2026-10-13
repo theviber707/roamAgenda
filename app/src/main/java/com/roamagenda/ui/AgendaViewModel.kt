@@ -8,8 +8,10 @@ package com.roamagenda.ui
 import android.app.Application
 import android.os.Build
 import android.os.Environment
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.roamagenda.R
 import com.roamagenda.data.AgendaPreferences
 import com.roamagenda.data.ParseResult
 import com.roamagenda.data.RoamAgendaParser
@@ -63,7 +65,8 @@ data class AgendaUiState(
     val agendaFilesCount: Int = 0,
     val error: AgendaError? = null,
     val lastCompletedRecord: CompletedTaskRecord? = null,
-    val activeClockedTask: RoamTask? = null
+    val activeClockedTask: RoamTask? = null,
+    val collapsedPriorities: Set<Char> = emptySet()
 )
 
 /**
@@ -72,6 +75,7 @@ data class AgendaUiState(
 sealed interface AgendaUiEvent {
     data class TaskCompleted(val task: RoamTask) : AgendaUiEvent
     data class TaskUndone(val task: RoamTask) : AgendaUiEvent
+    data class StringResMessage(@StringRes val messageRes: Int, val formatArgs: List<Any> = emptyList()) : AgendaUiEvent
     data class ShowMessage(val message: String) : AgendaUiEvent
 }
 
@@ -312,7 +316,7 @@ class AgendaViewModel(
                 _uiEvents.emit(AgendaUiEvent.TaskCompleted(task))
                 refreshTasks(isSilent = true)
             } else {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to update task in ${task.filePath}"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_update_task, listOf(task.filePath)))
                 refreshTasks(isSilent = true)
             }
         }
@@ -340,7 +344,7 @@ class AgendaViewModel(
                 _uiEvents.emit(AgendaUiEvent.TaskUndone(record.task))
                 refreshTasks(isSilent = true)
             } else {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to undo task"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_undo))
             }
         }
     }
@@ -395,7 +399,7 @@ class AgendaViewModel(
             }
 
             if (!success) {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to update step"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_update_step))
                 refreshTasks(isSilent = true)
             }
         }
@@ -419,10 +423,10 @@ class AgendaViewModel(
 
             if (success) {
                 val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Clocked in: $displayTitle"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clocked_in_msg, listOf(displayTitle)))
                 refreshTasks(isSilent = true)
             } else {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to clock in"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_clock_in))
             }
         }
     }
@@ -438,10 +442,10 @@ class AgendaViewModel(
 
             if (success) {
                 val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Clocked out: $displayTitle"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clocked_out_msg, listOf(displayTitle)))
                 refreshTasks(isSilent = true)
             } else {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to clock out"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_clock_out))
             }
         }
     }
@@ -456,11 +460,25 @@ class AgendaViewModel(
             }
 
             if (success) {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Clock cancelled"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clock_cancelled_msg))
                 refreshTasks(isSilent = true)
             } else {
-                _uiEvents.emit(AgendaUiEvent.ShowMessage("Failed to cancel clock"))
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_cancel_clock))
             }
+        }
+    }
+
+    /**
+     * Toggles the collapsed state for a given priority section (e.g. 'A', 'B', 'C').
+     */
+    fun togglePriorityCollapse(priority: Char) {
+        _uiState.update { current ->
+            val updated = if (priority in current.collapsedPriorities) {
+                current.collapsedPriorities - priority
+            } else {
+                current.collapsedPriorities + priority
+            }
+            current.copy(collapsedPriorities = updated)
         }
     }
 }

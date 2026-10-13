@@ -53,10 +53,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.roamagenda.R
 import com.roamagenda.data.PathUtils
 import java.io.File
 
@@ -129,7 +131,7 @@ fun DirectoryDialog(
             )
         },
         title = {
-            Text(text = "Select Org-Roam Directory")
+            Text(text = stringResource(R.string.select_org_roam_directory))
         },
         text = {
             Column(
@@ -153,7 +155,7 @@ fun DirectoryDialog(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("System Picker")
+                        Text(stringResource(R.string.system_picker))
                     }
 
                     OutlinedButton(
@@ -166,7 +168,7 @@ fun DirectoryDialog(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isManualMode) "Browse" else "Edit")
+                        Text(stringResource(if (isManualMode) R.string.browse else R.string.edit))
                     }
                 }
 
@@ -175,7 +177,7 @@ fun DirectoryDialog(
                 if (isManualMode) {
                     // Manual Text Input Mode
                     Text(
-                        text = "Enter the absolute path to your Org directory:",
+                        text = stringResource(R.string.enter_path_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -183,7 +185,7 @@ fun DirectoryDialog(
                     OutlinedTextField(
                         value = manualText,
                         onValueChange = { manualText = it },
-                        label = { Text("Directory Path") },
+                        label = { Text(stringResource(R.string.directory_path_label)) },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                         modifier = Modifier.fillMaxWidth()
@@ -197,7 +199,7 @@ fun DirectoryDialog(
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Text(
-                                text = "Current Directory:",
+                                text = stringResource(R.string.current_directory),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -230,13 +232,13 @@ fun DirectoryDialog(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "$orgFilesCount .org file(s) in this folder",
+                                            text = stringResource(R.string.org_files_in_folder, orgFilesCount),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer
                                         )
                                     } else {
                                         Text(
-                                            text = "0 .org files in this folder",
+                                            text = stringResource(R.string.no_org_files_in_folder),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -249,7 +251,7 @@ fun DirectoryDialog(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Subfolders (tap to open):",
+                        text = stringResource(R.string.subfolders_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -279,13 +281,13 @@ fun DirectoryDialog(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ArrowUpward,
-                                        contentDescription = "Go up",
+                                        contentDescription = stringResource(R.string.go_up),
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = ".. (Parent Folder)",
+                                        text = stringResource(R.string.parent_folder),
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
                                     )
                                 }
@@ -296,7 +298,7 @@ fun DirectoryDialog(
                         if (subDirs.isEmpty()) {
                             item {
                                 Text(
-                                    text = "No subfolders found",
+                                    text = stringResource(R.string.no_subfolders_found),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
@@ -337,7 +339,7 @@ fun DirectoryDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Presets:",
+                    text = stringResource(R.string.presets),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -376,12 +378,12 @@ fun DirectoryDialog(
                     }
                 }
             ) {
-                Text("Select This Folder")
+                Text(stringResource(R.string.select_this_folder))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

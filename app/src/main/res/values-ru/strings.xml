@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Roam Agenda</string>
+
+    <!-- Top App Bar & Subtitle -->
+    <string name="filter_all">Все</string>
+    <string name="filter_due">К выполнению</string>
+    <string name="agenda_subtitle">%1$d задач (%2$s) в %3$d заметках</string>
+    <string name="filter_desc_show_due">Показаны все (нажмите для задач к выполнению)</string>
+    <string name="filter_desc_show_all">Показаны к выполнению (нажмите для всех)</string>
+    <string name="configure_folder">Настроить папку</string>
+    <string name="refresh_agenda">Обновить повестку</string>
+    <string name="scanning_org_files">Сканирование файлов Org…</string>
+
+    <!-- Active Clock Banner -->
+    <string name="clocked_banner">На таймере: %1$s</string>
+    <string name="clock_out_button">Стоп</string>
+    <string name="cancel_clock">Отменить таймер</string>
+
+    <!-- Priority Headers -->
+    <string name="priority_high">Высокий приоритет</string>
+    <string name="priority_medium">Средний приоритет</string>
+    <string name="priority_low">Низкий приоритет</string>
+    <string name="priority_custom">Приоритет %1$s</string>
+
+    <!-- Task Card -->
+    <string name="clock_in">Запустить таймер</string>
+    <string name="clock_out">Остановить таймер</string>
+    <string name="clocked_in_badge">На таймере: %1$s</string>
+    <string name="badge_overdue">Просрочено: %1$s</string>
+    <string name="badge_today">Сегодня</string>
+    <string name="badge_due">Срок: %1$s</string>
+    <string name="steps_progress">%1$d из %2$d</string>
+    <string name="time_hours_minutes">%1$d ч %2$d мин</string>
+    <string name="time_hours">%1$d ч</string>
+    <string name="time_minutes">%1$d мин</string>
+
+    <!-- Empty State -->
+    <string name="no_prioritized_tasks">Нет приоритетных задач</string>
+    <string name="empty_hint_files_found">Найдено заметок с тегом :agenda:: %1$d, но нет заголовков с TODO/NEXT [#A/B/C].</string>
+    <string name="empty_hint_no_files">В настроенной папке не найдено файлов, содержащих #+filetags: :agenda:.</string>
+    <string name="refresh">Обновить</string>
+
+    <!-- Error Banner -->
+    <string name="directory_issue">Проблема с папкой</string>
+    <string name="directory_not_found">Настроенная папка не существует:\n%1$s</string>
+    <string name="not_a_directory">Указанный путь не является папкой:\n%1$s</string>
+    <string name="no_org_files_found">В папке не найдены файлы .org:\n%1$s</string>
+    <string name="retry">Повторить</string>
+    <string name="change_folder">Выбрать папку</string>
+
+    <!-- Feedback & Snackbars -->
+    <string name="completed_task">Выполнено: %1$s</string>
+    <string name="undo">Отменить</string>
+    <string name="restored_task">Восстановлено: %1$s</string>
+    <string name="clocked_in_msg">Таймер запущен: %1$s</string>
+    <string name="clocked_out_msg">Таймер остановлен: %1$s</string>
+    <string name="clock_cancelled_msg">Таймер отменён</string>
+    <string name="failed_to_clock_in">Не удалось запустить таймер</string>
+    <string name="failed_to_clock_out">Не удалось остановить таймер</string>
+    <string name="failed_to_cancel_clock">Не удалось отменить таймер</string>
+    <string name="failed_to_update_task">Не удалось обновить задачу в %1$s</string>
+    <string name="failed_to_undo">Не удалось отменить действие</string>
+    <string name="failed_to_update_step">Не удалось обновить пункт</string>
+
+    <!-- Storage Permission Prompt -->
+    <string name="storage_permission_required">Требуется доступ к памяти</string>
+    <string name="storage_permission_description">Roam Agenda требуется «Доступ ко всем файлам» (MANAGE_EXTERNAL_STORAGE) для прямого чтения заметок Org-Roam и обновления задач без задержек Storage Access Framework.</string>
+    <string name="grant_all_files_access">Предоставить доступ ко всем файлам</string>
+
+    <!-- Directory Dialog -->
+    <string name="select_org_roam_directory">Выбор папки Org-Roam</string>
+    <string name="system_picker">Системный выбор</string>
+    <string name="browse">Обзор</string>
+    <string name="edit">Изменить</string>
+    <string name="enter_path_hint">Введите абсолютный путь к папке Org:</string>
+    <string name="directory_path_label">Путь к папке</string>
+    <string name="current_directory">Текущая папка:</string>
+    <string name="org_files_in_folder">Файлов .org в этой папке: %1$d</string>
+    <string name="no_org_files_in_folder">0 файлов .org в этой папке</string>
+    <string name="subfolders_hint">Подпапки (нажмите, чтобы открыть):</string>
+    <string name="go_up">Вверх</string>
+    <string name="parent_folder">.. (Родительская папка)</string>
+    <string name="no_subfolders_found">Подпапки не найдены</string>
+    <string name="presets">Предустановки:</string>
+    <string name="select_this_folder">Выбрать эту папку</string>
+    <string name="cancel">Отмена</string>
+    <string name="expand_section">Развернуть раздел</string>
+    <string name="collapse_section">Свернуть раздел</string>
+</resources>

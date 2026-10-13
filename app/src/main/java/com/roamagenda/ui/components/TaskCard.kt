@@ -53,6 +53,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.roamagenda.R
 import com.roamagenda.data.RoamTask
 import com.roamagenda.data.TaskStep
 import com.roamagenda.ui.theme.OnPriorityBlueContainerDark
@@ -210,7 +212,7 @@ fun TaskCard(
                         ) {
                             Icon(
                                 imageVector = if (task.isClockedIn) Icons.Default.StopCircle else Icons.Default.PlayCircleOutline,
-                                contentDescription = if (task.isClockedIn) "Clock Out" else "Clock In",
+                                contentDescription = if (task.isClockedIn) stringResource(R.string.clock_out) else stringResource(R.string.clock_in),
                                 tint = if (task.isClockedIn) MaterialTheme.colorScheme.error else colors.badgeContent,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -336,9 +338,9 @@ fun TaskCard(
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                             val dateLabel = when {
-                                isOverdue -> "Overdue: ${task.scheduledDate}"
-                                isToday -> "Today"
-                                else -> "Due: ${task.scheduledDate}"
+                                isOverdue -> stringResource(R.string.badge_overdue, task.scheduledDate.toString())
+                                isToday -> stringResource(R.string.badge_today)
+                                else -> stringResource(R.string.badge_due, task.scheduledDate.toString())
                             }
 
                             Surface(
@@ -398,7 +400,7 @@ fun TaskCard(
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
-                                        text = "Clocked in: ${formatElapsedSeconds(elapsedSecs)}",
+                                        text = stringResource(R.string.clocked_in_badge, formatElapsedSeconds(elapsedSecs)),
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold
@@ -466,7 +468,7 @@ fun TaskCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "$checkedCount of $totalCount",
+                                text = stringResource(R.string.steps_progress, checkedCount, totalCount),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                                 color = colors.contentColor.copy(alpha = 0.7f)
                             )
@@ -575,13 +577,14 @@ private fun TaskStepRow(
     }
 }
 
+@Composable
 fun formatTotalClockedTime(totalMinutes: Long): String {
     val h = totalMinutes / 60
     val m = totalMinutes % 60
     return when {
-        h > 0 && m > 0 -> "${h}h ${m}m"
-        h > 0 -> "${h}h"
-        else -> "${m}m"
+        h > 0 && m > 0 -> stringResource(R.string.time_hours_minutes, h, m)
+        h > 0 -> stringResource(R.string.time_hours, h)
+        else -> stringResource(R.string.time_minutes, m)
     }
 }
 

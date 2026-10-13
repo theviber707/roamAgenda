@@ -12,16 +12,45 @@ android {
         applicationId = "com.roamagenda"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4.0"
+        versionCode = 6
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    val keystoreFile = listOfNotNull(
+        System.getenv("KEYSTORE_PATH")?.let { file(it) },
+        file("release.keystore"),
+        rootProject.file("release.keystore")
+    ).firstOrNull { it.exists() }
+
+    val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+        ?: System.getenv("KEY_PASSWORD")
+        ?: System.getenv("SIGNING_KEY_PASSWORD")
+    val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
+    val keyAlias = System.getenv("KEY_ALIAS") ?: "roamagenda"
+
+    val hasReleaseSigning = keystoreFile != null && !keystorePassword.isNullOrBlank()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

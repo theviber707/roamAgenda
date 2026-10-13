@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Roam Agenda</string>
+
+    <!-- Top App Bar & Subtitle -->
+    <string name="filter_all">Todas</string>
+    <string name="filter_due">Pendentes</string>
+    <string name="agenda_subtitle">%1$d tarefas (%2$s) em %3$d notas</string>
+    <string name="filter_desc_show_due">Mostrando todas (toque para pendentes)</string>
+    <string name="filter_desc_show_all">Mostrando pendentes (toque para todas)</string>
+    <string name="configure_folder">Configurar pasta</string>
+    <string name="refresh_agenda">Atualizar agenda</string>
+    <string name="scanning_org_files">Escanear arquivos Org…</string>
+
+    <!-- Active Clock Banner -->
+    <string name="clocked_banner">Cronômetro: %1$s</string>
+    <string name="clock_out_button">Parar</string>
+    <string name="cancel_clock">Cancelar cronômetro</string>
+
+    <!-- Priority Headers -->
+    <string name="priority_high">Alta Prioridade</string>
+    <string name="priority_medium">Média Prioridade</string>
+    <string name="priority_low">Baixa Prioridade</string>
+    <string name="priority_custom">Prioridade %1$s</string>
+
+    <!-- Task Card -->
+    <string name="clock_in">Iniciar cronômetro</string>
+    <string name="clock_out">Parar cronômetro</string>
+    <string name="clocked_in_badge">Em andamento: %1$s</string>
+    <string name="badge_overdue">Atrasada: %1$s</string>
+    <string name="badge_today">Hoje</string>
+    <string name="badge_due">Prazo: %1$s</string>
+    <string name="steps_progress">%1$d de %2$d</string>
+    <string name="time_hours_minutes">%1$dh %2$dmin</string>
+    <string name="time_hours">%1$dh</string>
+    <string name="time_minutes">%1$dmin</string>
+
+    <!-- Empty State -->
+    <string name="no_prioritized_tasks">Nenhuma tarefa priorizada</string>
+    <string name="empty_hint_files_found">Encontrada(s) %1$d nota(s) com a tag :agenda:, mas nenhum título com TODO/NEXT [#A/B/C].</string>
+    <string name="empty_hint_no_files">Nenhum arquivo contendo #+filetags: :agenda: encontrado no diretório configurado.</string>
+    <string name="refresh">Atualizar</string>
+
+    <!-- Error Banner -->
+    <string name="directory_issue">Problema no diretório</string>
+    <string name="directory_not_found">O diretório configurado não existe:\n%1$s</string>
+    <string name="not_a_directory">O caminho configurado não é um diretório:\n%1$s</string>
+    <string name="no_org_files_found">Nenhum arquivo .org encontrado no diretório:\n%1$s</string>
+    <string name="retry">Tentar novamente</string>
+    <string name="change_folder">Alterar pasta</string>
+
+    <!-- Feedback & Snackbars -->
+    <string name="completed_task">Concluída: %1$s</string>
+    <string name="undo">Desfazer</string>
+    <string name="restored_task">Restaurada: %1$s</string>
+    <string name="clocked_in_msg">Cronometrando: %1$s</string>
+    <string name="clocked_out_msg">Cronômetro finalizado: %1$s</string>
+    <string name="clock_cancelled_msg">Cronômetro cancelado</string>
+    <string name="failed_to_clock_in">Falha ao iniciar cronômetro</string>
+    <string name="failed_to_clock_out">Falha ao parar cronômetro</string>
+    <string name="failed_to_cancel_clock">Falha ao cancelar cronômetro</string>
+    <string name="failed_to_update_task">Falha ao atualizar tarefa em %1$s</string>
+    <string name="failed_to_undo">Falha ao desfazer tarefa</string>
+    <string name="failed_to_update_step">Falha ao atualizar etapa</string>
+
+    <!-- Storage Permission Prompt -->
+    <string name="storage_permission_required">Permissão de Armazenamento Necessária</string>
+    <string name="storage_permission_description">O Roam Agenda precisa de \"Acesso a todos os arquivos\" (MANAGE_EXTERNAL_STORAGE) para ler diretamente suas notas do Org-Roam e atualizar tarefas sem a sobrecarga do Storage Access Framework.</string>
+    <string name="grant_all_files_access">Conceder acesso a todos os arquivos</string>
+
+    <!-- Directory Dialog -->
+    <string name="select_org_roam_directory">Selecionar diretório do Org-Roam</string>
+    <string name="system_picker">Seletor do sistema</string>
+    <string name="browse">Navegar</string>
+    <string name="edit">Editar</string>
+    <string name="enter_path_hint">Digite o caminho absoluto para o seu diretório Org:</string>
+    <string name="directory_path_label">Caminho do diretório</string>
+    <string name="current_directory">Diretório atual:</string>
+    <string name="org_files_in_folder">%1$d arquivo(s) .org nesta pasta</string>
+    <string name="no_org_files_in_folder">0 arquivos .org nesta pasta</string>
+    <string name="subfolders_hint">Subpastas (toque para abrir):</string>
+    <string name="go_up">Subir</string>
+    <string name="parent_folder">.. (Pasta anterior)</string>
+    <string name="no_subfolders_found">Nenhuma subpasta encontrada</string>
+    <string name="presets">Atalhos:</string>
+    <string name="select_this_folder">Selecionar esta pasta</string>
+    <string name="cancel">Cancelar</string>
+    <string name="expand_section">Expandir seção</string>
+    <string name="collapse_section">Recolher seção</string>
+</resources>

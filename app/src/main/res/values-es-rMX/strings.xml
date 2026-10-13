@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Roam Agenda</string>
+
+    <!-- Top App Bar & Subtitle -->
+    <string name="filter_all">Todas</string>
+    <string name="filter_due">Pendientes</string>
+    <string name="agenda_subtitle">%1$d tareas (%2$s) en %3$d notas</string>
+    <string name="filter_desc_show_due">Mostrando todas (toca para pendientes)</string>
+    <string name="filter_desc_show_all">Mostrando pendientes (toca para todas)</string>
+    <string name="configure_folder">Configurar carpeta</string>
+    <string name="refresh_agenda">Actualizar agenda</string>
+    <string name="scanning_org_files">Buscando archivos Org…</string>
+
+    <!-- Active Clock Banner -->
+    <string name="clocked_banner">Tiempo: %1$s</string>
+    <string name="clock_out_button">Detener</string>
+    <string name="cancel_clock">Cancelar tiempo</string>
+
+    <!-- Priority Headers -->
+    <string name="priority_high">Alta Prioridad</string>
+    <string name="priority_medium">Media Prioridad</string>
+    <string name="priority_low">Baja Prioridad</string>
+    <string name="priority_custom">Prioridad %1$s</string>
+
+    <!-- Task Card -->
+    <string name="clock_in">Iniciar tiempo</string>
+    <string name="clock_out">Detener tiempo</string>
+    <string name="clocked_in_badge">En curso: %1$s</string>
+    <string name="badge_overdue">Vencida: %1$s</string>
+    <string name="badge_today">Hoy</string>
+    <string name="badge_due">Para: %1$s</string>
+    <string name="steps_progress">%1$d de %2$d</string>
+    <string name="time_hours_minutes">%1$dh %2$dmin</string>
+    <string name="time_hours">%1$dh</string>
+    <string name="time_minutes">%1$dmin</string>
+
+    <!-- Empty State -->
+    <string name="no_prioritized_tasks">Sin tareas priorizadas</string>
+    <string name="empty_hint_files_found">Se encontraron %1$d nota(s) con la etiqueta :agenda:, pero sin encabezados TODO/NEXT [#A/B/C].</string>
+    <string name="empty_hint_no_files">No se encontraron archivos con #+filetags: :agenda: en el directorio configurado.</string>
+    <string name="refresh">Actualizar</string>
+
+    <!-- Error Banner -->
+    <string name="directory_issue">Problema con el directorio</string>
+    <string name="directory_not_found">El directorio configurado no existe:\n%1$s</string>
+    <string name="not_a_directory">La ruta configurada no es un directorio:\n%1$s</string>
+    <string name="no_org_files_found">No se encontraron archivos .org en el directorio:\n%1$s</string>
+    <string name="retry">Reintentar</string>
+    <string name="change_folder">Cambiar carpeta</string>
+
+    <!-- Feedback & Snackbars -->
+    <string name="completed_task">Completada: %1$s</string>
+    <string name="undo">Deshacer</string>
+    <string name="restored_task">Restaurada: %1$s</string>
+    <string name="clocked_in_msg">Tiempo iniciado: %1$s</string>
+    <string name="clocked_out_msg">Tiempo detenido: %1$s</string>
+    <string name="clock_cancelled_msg">Tiempo cancelado</string>
+    <string name="failed_to_clock_in">Error al iniciar tiempo</string>
+    <string name="failed_to_clock_out">Error al detener tiempo</string>
+    <string name="failed_to_cancel_clock">Error al cancelar tiempo</string>
+    <string name="failed_to_update_task">Error al actualizar la tarea en %1$s</string>
+    <string name="failed_to_undo">Error al deshacer la tarea</string>
+    <string name="failed_to_update_step">Error al actualizar paso</string>
+
+    <!-- Storage Permission Prompt -->
+    <string name="storage_permission_required">Permiso de Almacenamiento Requerido</string>
+    <string name="storage_permission_description">Roam Agenda necesita \"Acceso a todos los archivos\" (MANAGE_EXTERNAL_STORAGE) para leer directamente sus notas de Org-Roam y actualizar tareas sin la sobrecarga del Storage Access Framework.</string>
+    <string name="grant_all_files_access">Permitir acceso a todos los archivos</string>
+
+    <!-- Directory Dialog -->
+    <string name="select_org_roam_directory">Seleccionar directorio de Org-Roam</string>
+    <string name="system_picker">Selector del sistema</string>
+    <string name="browse">Explorar</string>
+    <string name="edit">Editar</string>
+    <string name="enter_path_hint">Introduce la ruta absoluta a tu directorio Org:</string>
+    <string name="directory_path_label">Ruta del directorio</string>
+    <string name="current_directory">Directorio actual:</string>
+    <string name="org_files_in_folder">%1$d archivo(s) .org en esta carpeta</string>
+    <string name="no_org_files_in_folder">0 archivos .org en esta carpeta</string>
+    <string name="subfolders_hint">Subcarpetas (toca para abrir):</string>
+    <string name="go_up">Subir</string>
+    <string name="parent_folder">.. (Carpeta superior)</string>
+    <string name="no_subfolders_found">No se encontraron subcarpetas</string>
+    <string name="presets">Preajustes:</string>
+    <string name="select_this_folder">Seleccionar esta carpeta</string>
+    <string name="cancel">Cancelar</string>
+    <string name="expand_section">Expandir sección</string>
+    <string name="collapse_section">Contraer sección</string>
+</resources>

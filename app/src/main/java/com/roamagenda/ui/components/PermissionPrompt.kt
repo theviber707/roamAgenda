@@ -31,9 +31,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.roamagenda.R
 
 @Composable
 fun PermissionPrompt(
@@ -72,7 +74,7 @@ fun PermissionPrompt(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Storage Permission Required",
+                    text = stringResource(R.string.storage_permission_required),
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -81,7 +83,7 @@ fun PermissionPrompt(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Roam Agenda needs \"All Files Access\" (MANAGE_EXTERNAL_STORAGE) to directly read your Org-Roam notes and update tasks in-place without Storage Access Framework overhead.",
+                    text = stringResource(R.string.storage_permission_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center
@@ -96,7 +98,7 @@ fun PermissionPrompt(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Grant All Files Access")
+                    Text(stringResource(R.string.grant_all_files_access))
                 }
             }
         }

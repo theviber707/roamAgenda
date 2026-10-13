@@ -67,11 +67,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.roamagenda.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.roamagenda.data.RoamTask
 import com.roamagenda.ui.components.DirectoryDialog
@@ -90,6 +93,7 @@ fun AgendaScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDirectoryDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // Listen for UI events (such as task completion with Undo action)
     LaunchedEffect(Unit) {
@@ -98,8 +102,8 @@ fun AgendaScreen(
                 is AgendaUiEvent.TaskCompleted -> {
                     val displayTitle = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(event.task.title)
                     val result = snackbarHostState.showSnackbar(
-                        message = "Completed: $displayTitle",
-                        actionLabel = "Undo",
+                        message = context.getString(R.string.completed_task, displayTitle),
+                        actionLabel = context.getString(R.string.undo),
                         duration = SnackbarDuration.Short
                     )
                     if (result == SnackbarResult.ActionPerformed) {
@@ -109,7 +113,14 @@ fun AgendaScreen(
                 is AgendaUiEvent.TaskUndone -> {
                     val displayTitle = com.roamagenda.data.RoamAgendaParser.formatOrgTitle(event.task.title)
                     snackbarHostState.showSnackbar(
-                        message = "Restored: $displayTitle",
+                        message = context.getString(R.string.restored_task, displayTitle),
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is AgendaUiEvent.StringResMessage -> {
+                    val message = context.getString(event.messageRes, *event.formatArgs.toTypedArray())
+                    snackbarHostState.showSnackbar(
+                        message = message,
                         duration = SnackbarDuration.Short
                     )
                 }
@@ -142,12 +153,12 @@ fun AgendaScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Roam Agenda",
+                            text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         if (uiState.hasStoragePermission && uiState.error == null) {
-                            val filterMode = if (uiState.showFutureTasks) "All" else "Due"
-                            val subtitle = "${uiState.totalTaskCount} tasks ($filterMode) across ${uiState.agendaFilesCount} notes"
+                            val filterMode = if (uiState.showFutureTasks) stringResource(R.string.filter_all) else stringResource(R.string.filter_due)
+                            val subtitle = stringResource(R.string.agenda_subtitle, uiState.totalTaskCount, filterMode, uiState.agendaFilesCount)
                             Text(
                                 text = subtitle,
                                 style = MaterialTheme.typography.bodySmall,
@@ -163,14 +174,14 @@ fun AgendaScreen(
                     ) {
                         Icon(
                             imageVector = if (uiState.showFutureTasks) Icons.Default.EventAvailable else Icons.Default.Today,
-                            contentDescription = if (uiState.showFutureTasks) "Showing All (tap for Due only)" else "Showing Due (tap for All)",
+                            contentDescription = if (uiState.showFutureTasks) stringResource(R.string.filter_desc_show_due) else stringResource(R.string.filter_desc_show_all),
                             tint = if (uiState.showFutureTasks) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = { showDirectoryDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "Configure Folder",
+                            contentDescription = stringResource(R.string.configure_folder),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -180,7 +191,7 @@ fun AgendaScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Agenda"
+                            contentDescription = stringResource(R.string.refresh_agenda)
                         )
                     }
                 },
@@ -260,24 +271,29 @@ fun AgendaScreen(
 
                                     // Grouped Tasks by Priority
                                     uiState.tasksByPriority.forEach { (priority, tasks) ->
+                                        val isCollapsed = priority in uiState.collapsedPriorities
                                         stickyHeader(key = "header_$priority") {
                                             PriorityHeader(
                                                 priority = priority,
-                                                taskCount = tasks.size
+                                                taskCount = tasks.size,
+                                                isCollapsed = isCollapsed,
+                                                onToggleCollapse = { viewModel.togglePriorityCollapse(priority) }
                                             )
                                         }
 
-                                        items(
-                                            items = tasks,
-                                            key = { it.id }
-                                        ) { task ->
-                                            TaskCard(
-                                                task = task,
-                                                onMarkDone = { viewModel.markTaskDone(it) },
-                                                onToggleStep = { t, s, checked -> viewModel.toggleTaskStep(t, s, checked) },
-                                                onClockIn = { viewModel.clockIn(it) },
-                                                onClockOut = { viewModel.clockOut(it) }
-                                            )
+                                        if (!isCollapsed) {
+                                            items(
+                                                items = tasks,
+                                                key = { it.id }
+                                            ) { task ->
+                                                TaskCard(
+                                                    task = task,
+                                                    onMarkDone = { viewModel.markTaskDone(it) },
+                                                    onToggleStep = { t, s, checked -> viewModel.toggleTaskStep(t, s, checked) },
+                                                    onClockIn = { viewModel.clockIn(it) },
+                                                    onClockOut = { viewModel.clockOut(it) }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -303,7 +319,7 @@ fun AgendaScreen(
                                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                                         Spacer(modifier = Modifier.width(16.dp))
                                         Text(
-                                            text = "Scanning Org files...",
+                                            text = stringResource(R.string.scanning_org_files),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
@@ -326,11 +342,11 @@ private fun ErrorBanner(
 ) {
     val message = when (error) {
         is AgendaError.DirectoryNotFound ->
-            "Configured directory does not exist:\n${error.path}"
+            stringResource(R.string.directory_not_found, error.path)
         is AgendaError.NotADirectory ->
-            "Configured path is not a directory:\n${error.path}"
+            stringResource(R.string.not_a_directory, error.path)
         is AgendaError.NoOrgFilesFound ->
-            "No .org files found in directory:\n${error.path}"
+            stringResource(R.string.no_org_files_found, error.path)
         is AgendaError.Generic ->
             error.message
     }
@@ -357,7 +373,7 @@ private fun ErrorBanner(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Directory Issue",
+                    text = stringResource(R.string.directory_issue),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
@@ -383,7 +399,7 @@ private fun ErrorBanner(
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     )
                 ) {
-                    Text("Retry")
+                    Text(stringResource(R.string.retry))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(
@@ -392,7 +408,7 @@ private fun ErrorBanner(
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     )
                 ) {
-                    Text("Change Folder")
+                    Text(stringResource(R.string.change_folder))
                 }
             }
         }
@@ -422,7 +438,7 @@ private fun EmptyStateView(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "No Prioritized Tasks",
+            text = stringResource(R.string.no_prioritized_tasks),
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
@@ -431,9 +447,9 @@ private fun EmptyStateView(
         Spacer(modifier = Modifier.height(8.dp))
 
         val hint = if (agendaFilesCount > 0) {
-            "Found $agendaFilesCount note(s) tagged :agenda:, but no headlines with TODO/NEXT [#A/B/C]."
+            stringResource(R.string.empty_hint_files_found, agendaFilesCount)
         } else {
-            "No files containing `#+filetags: :agenda:` found in the configured directory."
+            stringResource(R.string.empty_hint_no_files)
         }
 
         Text(
@@ -448,7 +464,7 @@ private fun EmptyStateView(
         OutlinedButton(onClick = onRefresh) {
             Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text("Refresh")
+            Text(stringResource(R.string.refresh))
         }
     }
 }
@@ -513,7 +529,7 @@ private fun ActiveClockBanner(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "Clocked: ${formatElapsedSeconds(elapsedSeconds)}",
+                    text = stringResource(R.string.clocked_banner, formatElapsedSeconds(elapsedSeconds)),
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Medium
@@ -534,7 +550,7 @@ private fun ActiveClockBanner(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Out", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.clock_out_button), style = MaterialTheme.typography.labelMedium)
             }
 
             Spacer(modifier = Modifier.width(4.dp))
@@ -545,7 +561,7 @@ private fun ActiveClockBanner(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Cancel Clock",
+                    contentDescription = stringResource(R.string.cancel_clock),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                     modifier = Modifier.size(18.dp)
                 )

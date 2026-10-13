@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Roam Agenda</string>
+
+    <!-- Top App Bar & Subtitle -->
+    <string name="filter_all">All</string>
+    <string name="filter_due">Due</string>
+    <string name="agenda_subtitle">%1$d tasks (%2$s) across %3$d notes</string>
+    <string name="filter_desc_show_due">Showing All (tap for Due only)</string>
+    <string name="filter_desc_show_all">Showing Due (tap for All)</string>
+    <string name="configure_folder">Configure Folder</string>
+    <string name="refresh_agenda">Refresh Agenda</string>
+    <string name="scanning_org_files">Scanning Org files…</string>
+
+    <!-- Active Clock Banner -->
+    <string name="clocked_banner">Clocked: %1$s</string>
+    <string name="clock_out_button">Out</string>
+    <string name="cancel_clock">Cancel Clock</string>
+
+    <!-- Priority Headers -->
+    <string name="priority_high">High Priority</string>
+    <string name="priority_medium">Medium Priority</string>
+    <string name="priority_low">Low Priority</string>
+    <string name="priority_custom">Priority %1$s</string>
+
+    <!-- Task Card -->
+    <string name="clock_in">Clock In</string>
+    <string name="clock_out">Clock Out</string>
+    <string name="clocked_in_badge">Clocked in: %1$s</string>
+    <string name="badge_overdue">Overdue: %1$s</string>
+    <string name="badge_today">Today</string>
+    <string name="badge_due">Due: %1$s</string>
+    <string name="steps_progress">%1$d of %2$d</string>
+    <string name="time_hours_minutes">%1$dh %2$dm</string>
+    <string name="time_hours">%1$dh</string>
+    <string name="time_minutes">%1$dm</string>
+
+    <!-- Empty State -->
+    <string name="no_prioritized_tasks">No Prioritized Tasks</string>
+    <string name="empty_hint_files_found">Found %1$d note(s) tagged :agenda:, but no headlines with TODO/NEXT [#A/B/C].</string>
+    <string name="empty_hint_no_files">No files containing #+filetags: :agenda: found in the configured directory.</string>
+    <string name="refresh">Refresh</string>
+
+    <!-- Error Banner -->
+    <string name="directory_issue">Directory Issue</string>
+    <string name="directory_not_found">Configured directory does not exist:\n%1$s</string>
+    <string name="not_a_directory">Configured path is not a directory:\n%1$s</string>
+    <string name="no_org_files_found">No .org files found in directory:\n%1$s</string>
+    <string name="retry">Retry</string>
+    <string name="change_folder">Change Folder</string>
+
+    <!-- Feedback & Snackbars -->
+    <string name="completed_task">Completed: %1$s</string>
+    <string name="undo">Undo</string>
+    <string name="restored_task">Restored: %1$s</string>
+    <string name="clocked_in_msg">Clocked in: %1$s</string>
+    <string name="clocked_out_msg">Clocked out: %1$s</string>
+    <string name="clock_cancelled_msg">Clock cancelled</string>
+    <string name="failed_to_clock_in">Failed to clock in</string>
+    <string name="failed_to_clock_out">Failed to clock out</string>
+    <string name="failed_to_cancel_clock">Failed to cancel clock</string>
+    <string name="failed_to_update_task">Failed to update task in %1$s</string>
+    <string name="failed_to_undo">Failed to undo task</string>
+    <string name="failed_to_update_step">Failed to update step</string>
+
+    <!-- Storage Permission Prompt -->
+    <string name="storage_permission_required">Storage Permission Required</string>
+    <string name="storage_permission_description">Roam Agenda needs \"All Files Access\" (MANAGE_EXTERNAL_STORAGE) to directly read your Org-Roam notes and update tasks in-place without Storage Access Framework overhead.</string>
+    <string name="grant_all_files_access">Grant All Files Access</string>
+
+    <!-- Directory Dialog -->
+    <string name="select_org_roam_directory">Select Org-Roam Directory</string>
+    <string name="system_picker">System Picker</string>
+    <string name="browse">Browse</string>
+    <string name="edit">Edit</string>
+    <string name="enter_path_hint">Enter the absolute path to your Org directory:</string>
+    <string name="directory_path_label">Directory Path</string>
+    <string name="current_directory">Current Directory:</string>
+    <string name="org_files_in_folder">%1$d .org file(s) in this folder</string>
+    <string name="no_org_files_in_folder">0 .org files in this folder</string>
+    <string name="subfolders_hint">Subfolders (tap to open):</string>
+    <string name="go_up">Go up</string>
+    <string name="parent_folder">.. (Parent Folder)</string>
+    <string name="no_subfolders_found">No subfolders found</string>
+    <string name="presets">Presets:</string>
+    <string name="select_this_folder">Select This Folder</string>
+    <string name="cancel">Cancel</string>
+    <string name="expand_section">Expand section</string>
+    <string name="collapse_section">Collapse section</string>
+</resources>

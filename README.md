@@ -42,6 +42,7 @@ When managing notes in Emacs using Org Mode and Org-Roam, desktop agenda workflo
 
 - **Material 3 Design**: Clean interface with dynamic color theming, dark theme support, and edge-to-edge styling.
 - **Priority-Coded Sections**: Tasks grouped by Priority (`[#A]`, `[#B]`, `[#C]`) with distinct color accents (red tint for #A, blue for #B, green for #C).
+- **Collapsible Priority Sections**: Tap any priority header row to collapse or expand its task list, with smooth animated arrow indicators and task count badges.
 - **Task Metadata**:
   - Origin note title badge (from `#+title:` or filename).
   - Keyword indicator (`TODO` vs `NEXT`).
@@ -59,6 +60,7 @@ When managing notes in Emacs using Org Mode and Org-Roam, desktop agenda workflo
   - Automatically updates `:LAST_REPEAT: [YYYY-MM-DD Day HH:MM]` under `:PROPERTIES:`.
   - Appends `- State "DONE" from "TODO" [timestamp]` to `:LOGBOOK:`.
 - **Lossless Undo**: Snackbar with "Undo" restores the exact prior file contents on disk.
+- **Internationalization (i18n)**: Fully localized in American English (`en-US`), Brazilian Portuguese (`pt-BR`), Mexican Spanish (`es-MX`), and Russian (`ru`), supporting Android 13+ per-app language preferences.
 - **Configurable Storage Directory**: Persistent root path configuration via AndroidX DataStore (defaults to `/sdcard/Org/roam`).
 - **Seamless Permission Handling**: Detects "All Files Access" state on launch and automatically resumes scanning when returning from System Settings.
 
