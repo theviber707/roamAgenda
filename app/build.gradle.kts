@@ -12,8 +12,8 @@ android {
         applicationId = "com.roamagenda"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.5.2"
+        versionCode = 9
+        versionName = "1.5.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,11 +24,14 @@ android {
         rootProject.file("release.keystore")
     ).firstOrNull { it.exists() }
 
-    val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-        ?: System.getenv("KEY_PASSWORD")
-        ?: System.getenv("SIGNING_KEY_PASSWORD")
-    val keyPassword = System.getenv("KEY_PASSWORD") ?: keystorePassword
-    val keyAlias = System.getenv("KEY_ALIAS") ?: "roamagenda"
+    val keystorePassword = listOfNotNull(
+        System.getenv("KEYSTORE_PASSWORD"),
+        System.getenv("KEY_PASSWORD"),
+        System.getenv("SIGNING_KEY_PASSWORD")
+    ).firstOrNull { it.isNotBlank() }
+
+    val keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: keystorePassword
+    val keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "roamagenda"
 
     val hasReleaseSigning = keystoreFile != null && !keystorePassword.isNullOrBlank()
 
