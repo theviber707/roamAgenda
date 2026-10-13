@@ -48,17 +48,27 @@ jobs:
           generate_release_notes: true
 
       - name: Notify F-Droid Repo
+        continue-on-error: true
         env:
           PAT: ${{ secrets.FDROID_REPO_PAT }}
         run: |
           if [ -n "$PAT" ]; then
             echo "Dispatching update-repo event to theviber707/fdroid-repo..."
-            curl -f -s -X POST \
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $PAT" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -H "User-Agent: GitHub-Actions" \
               https://api.github.com/repos/theviber707/fdroid-repo/dispatches \
-              -d "{\"event_type\":\"update-repo\",\"client_payload\":{\"tag\":\"${{ github.ref_name }}\"}}"
-            echo "Successfully notified fdroid-repo."
+              -d "{\"event_type\":\"update-repo\",\"client_payload\":{\"tag\":\"${{ github.ref_name }}\"}}")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "Successfully notified fdroid-repo (HTTP $HTTP_CODE)."
+            else
+              echo "::warning::Failed to notify fdroid-repo (HTTP $HTTP_CODE): $BODY"
+              echo "F-Droid repo update will run on its next scheduled poll or manual workflow run."
+            fi
           else
             echo "Note: Secret FDROID_REPO_PAT is not set. F-Droid repo update will run on its next scheduled poll or manual workflow run."
           fi
