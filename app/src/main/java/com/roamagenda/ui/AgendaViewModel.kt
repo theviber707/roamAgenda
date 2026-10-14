@@ -17,6 +17,7 @@ import com.roamagenda.data.ParseResult
 import com.roamagenda.data.RoamAgendaParser
 import com.roamagenda.data.RoamTask
 import com.roamagenda.data.TaskStep
+import com.roamagenda.notification.ClockNotificationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,6 +106,13 @@ class AgendaViewModel(
                     }
                 }
         }
+
+        // Listen for clock action events from the notification receiver
+        viewModelScope.launch {
+            ClockNotificationManager.clockEvents.collect {
+                refreshTasks(isSilent = true)
+            }
+        }
     }
 
     /**
@@ -134,6 +142,16 @@ class AgendaViewModel(
         val isGranted = checkStoragePermission()
         if (!wasGranted && isGranted) {
             refreshTasks(isSilent = false)
+        }
+    }
+
+    /**
+     * Called when the notification permission is granted on Android 13+.
+     */
+    fun onNotificationPermissionGranted() {
+        val activeClocked = _uiState.value.activeClockedTask
+        if (activeClocked != null) {
+            ClockNotificationManager.show(getApplication(), activeClocked)
         }
     }
 
@@ -191,6 +209,11 @@ class AgendaViewModel(
                     val grouped = visible.groupBy { it.priority }.toSortedMap()
 
                     val activeClocked = result.tasks.firstOrNull { it.isClockedIn }
+                    if (activeClocked != null) {
+                        ClockNotificationManager.show(getApplication(), activeClocked)
+                    } else {
+                        ClockNotificationManager.cancel(getApplication())
+                    }
 
                     _uiState.update {
                         it.copy(
@@ -208,6 +231,7 @@ class AgendaViewModel(
                 }
 
                 is ParseResult.DirectoryNotFound -> {
+                    ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -222,6 +246,7 @@ class AgendaViewModel(
                 }
 
                 is ParseResult.NotADirectory -> {
+                    ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -235,6 +260,7 @@ class AgendaViewModel(
                 }
 
                 is ParseResult.NoOrgFilesFound -> {
+                    ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -248,6 +274,7 @@ class AgendaViewModel(
                 }
 
                 is ParseResult.Error -> {
+                    ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -441,6 +468,7 @@ class AgendaViewModel(
             }
 
             if (success) {
+                ClockNotificationManager.cancel(getApplication())
                 val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
                 _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clocked_out_msg, listOf(displayTitle)))
                 refreshTasks(isSilent = true)
@@ -460,6 +488,7 @@ class AgendaViewModel(
             }
 
             if (success) {
+                ClockNotificationManager.cancel(getApplication())
                 _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clock_cancelled_msg))
                 refreshTasks(isSilent = true)
             } else {

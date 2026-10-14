@@ -87,4 +87,10 @@
     <string name="cancel">Отмена</string>
     <string name="expand_section">Развернуть раздел</string>
     <string name="collapse_section">Свернуть раздел</string>
+
+    <!-- Clock Ongoing Notification -->
+    <string name="notification_channel_clock_name">Активный таймер</string>
+    <string name="notification_channel_clock_desc">Отображает текущий таймер задачи Org-Roam</string>
+    <string name="clock_notification_org_clock">Org Clock</string>
+    <string name="clock_out_and_done">Готово</string>
 </resources>

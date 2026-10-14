@@ -5,11 +5,17 @@
 
 package com.roamagenda.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -29,6 +35,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EventAvailable
@@ -38,6 +45,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -92,6 +100,13 @@ fun AgendaScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.onNotificationPermissionGranted()
+        }
+    }
     var showDirectoryDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -227,6 +242,7 @@ fun AgendaScreen(
                             uiState.activeClockedTask?.let { clockedTask ->
                                 ActiveClockBanner(
                                     task = clockedTask,
+                                    onClockOutAndDone = { viewModel.markTaskDone(clockedTask) },
                                     onClockOut = { viewModel.clockOut(clockedTask) },
                                     onCancelClock = { viewModel.cancelClock(clockedTask) }
                                 )
@@ -290,7 +306,18 @@ fun AgendaScreen(
                                                     task = task,
                                                     onMarkDone = { viewModel.markTaskDone(it) },
                                                     onToggleStep = { t, s, checked -> viewModel.toggleTaskStep(t, s, checked) },
-                                                    onClockIn = { viewModel.clockIn(it) },
+                                                    onClockIn = {
+                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                            if (ContextCompat.checkSelfPermission(
+                                                                    context,
+                                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                                ) != PackageManager.PERMISSION_GRANTED
+                                                            ) {
+                                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                            }
+                                                        }
+                                                        viewModel.clockIn(it)
+                                                    },
                                                     onClockOut = { viewModel.clockOut(it) }
                                                 )
                                             }
@@ -472,6 +499,7 @@ private fun EmptyStateView(
 @Composable
 private fun ActiveClockBanner(
     task: RoamTask,
+    onClockOutAndDone: () -> Unit,
     onClockOut: () -> Unit,
     onCancelClock: () -> Unit,
     modifier: Modifier = Modifier
@@ -540,9 +568,31 @@ private fun ActiveClockBanner(
 
             Spacer(modifier = Modifier.width(8.dp))
 
+            Button(
+                onClick = onClockOutAndDone,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = stringResource(R.string.clock_out_and_done),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             FilledTonalButton(
                 onClick = onClockOut,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Stop,

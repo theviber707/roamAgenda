@@ -87,4 +87,10 @@
     <string name="cancel">Cancel</string>
     <string name="expand_section">Expand section</string>
     <string name="collapse_section">Collapse section</string>
+
+    <!-- Clock Ongoing Notification -->
+    <string name="notification_channel_clock_name">Active Clock</string>
+    <string name="notification_channel_clock_desc">Displays ongoing timer when clocked into an Org-Roam task</string>
+    <string name="clock_notification_org_clock">Org Clock</string>
+    <string name="clock_out_and_done">Done</string>
 </resources>

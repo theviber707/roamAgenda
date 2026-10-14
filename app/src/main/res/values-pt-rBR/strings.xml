@@ -87,4 +87,10 @@
     <string name="cancel">Cancelar</string>
     <string name="expand_section">Expandir seção</string>
     <string name="collapse_section">Recolher seção</string>
+
+    <!-- Clock Ongoing Notification -->
+    <string name="notification_channel_clock_name">Registro de Tempo Ativo</string>
+    <string name="notification_channel_clock_desc">Exibe o cronômetro ativo quando uma tarefa do Org-Roam está sendo cronometrada</string>
+    <string name="clock_notification_org_clock">Org Clock</string>
+    <string name="clock_out_and_done">Concluir</string>
 </resources>
