@@ -82,24 +82,9 @@ object ClockNotificationManager {
     }
 
     /**
-     * Shows or updates the ongoing clock notification.
+     * Builds the NotificationCompat.Builder for an ongoing clock notification.
      */
-    fun show(context: Context, task: RoamTask) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                return
-            }
-        }
-
-        createNotificationChannel(context)
-
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
+    fun buildNotification(context: Context, task: RoamTask): NotificationCompat.Builder {
         val startTimeMillis = task.clockStartTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
             ?: System.currentTimeMillis()
 
@@ -183,7 +168,10 @@ object ClockNotificationManager {
             putInt("android.ongoingActivityNoti.style", 1)
             putInt("android.ongoingActivityNoti.actionType", 1)
             putInt("android.ongoingActivityNoti.actionPrimarySet", 0)
+            putString("android.ongoingActivityNoti.primaryInfo", displayTitle)
+            putString("android.ongoingActivityNoti.secondaryInfo", contentText)
             putString("android.ongoingActivityNoti.nowbarPrimaryInfo", displayTitle)
+            putString("android.ongoingActivityNoti.nowbarSecondaryInfo", contentText)
             putInt("android.ongoingActivityNoti.chipBgColor", primaryColor)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 putParcelable(
@@ -193,6 +181,9 @@ object ClockNotificationManager {
             }
             // Android 16 Promoted Ongoing Notification (Live Update)
             putBoolean("android.requestPromotedOngoing", true)
+            // Explicitly preserve chronometer flag so OEM builders do not strip it
+            putBoolean(NotificationCompat.EXTRA_SHOW_CHRONOMETER, true)
+            putBoolean("android.showChronometer", true)
         }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_CLOCK)
@@ -201,6 +192,7 @@ object ClockNotificationManager {
             .setContentText(contentText)
             .setSubText(context.getString(R.string.clock_notification_org_clock))
             .setUsesChronometer(true)
+            .setChronometerCountDown(false)
             .setShowWhen(true)
             .setWhen(startTimeMillis)
             .setOngoing(true)
@@ -225,7 +217,7 @@ object ClockNotificationManager {
                 context.getString(R.string.cancel),
                 cancelPendingIntent
             )
-            .setExtras(extras)
+            .addExtras(extras)
 
         // Android 16 Live Updates promoted ongoing method (reflection for forward compatibility)
         try {
@@ -257,6 +249,29 @@ object ClockNotificationManager {
             }
         }
 
+        return builder
+    }
+
+    /**
+     * Shows or updates the ongoing clock notification.
+     */
+    fun show(context: Context, task: RoamTask) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+        }
+
+        createNotificationChannel(context)
+
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val builder = buildNotification(context, task)
         notificationManager.notify(NOTIFICATION_ID_CLOCK, builder.build())
     }
 
