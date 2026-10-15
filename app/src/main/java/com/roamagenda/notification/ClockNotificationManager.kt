@@ -15,6 +15,8 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.roamagenda.MainActivity
@@ -85,8 +87,11 @@ object ClockNotificationManager {
      * Builds the NotificationCompat.Builder for an ongoing clock notification.
      */
     fun buildNotification(context: Context, task: RoamTask): NotificationCompat.Builder {
+        val nowEpoch = System.currentTimeMillis()
         val startTimeMillis = task.clockStartTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-            ?: System.currentTimeMillis()
+            ?: nowEpoch
+        val elapsedMillis = (nowEpoch - startTimeMillis).coerceAtLeast(0L)
+        val chronometerBase = SystemClock.elapsedRealtime() - elapsedMillis
 
         val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
 
@@ -96,6 +101,18 @@ object ClockNotificationManager {
             if (task.fileTitle.isNotBlank()) "$stepsProgress • ${task.fileTitle}" else stepsProgress
         } else {
             task.fileTitle.ifBlank { context.getString(R.string.app_name) }
+        }
+
+        // Custom RemoteViews with prominent live ticking Chronometer (matching stopwatch UI)
+        val collapsedView = RemoteViews(context.packageName, R.layout.notification_clock).apply {
+            setChronometer(R.id.notification_chronometer, chronometerBase, null, true)
+            setTextViewText(R.id.notification_task_title, displayTitle)
+            setTextViewText(R.id.notification_task_subtitle, contentText)
+        }
+        val expandedView = RemoteViews(context.packageName, R.layout.notification_clock_expanded).apply {
+            setChronometer(R.id.notification_chronometer, chronometerBase, null, true)
+            setTextViewText(R.id.notification_task_title, displayTitle)
+            setTextViewText(R.id.notification_task_subtitle, contentText)
         }
 
         // Tap notification to open MainActivity
@@ -173,6 +190,12 @@ object ClockNotificationManager {
             putString("android.ongoingActivityNoti.nowbarPrimaryInfo", displayTitle)
             putString("android.ongoingActivityNoti.nowbarSecondaryInfo", contentText)
             putInt("android.ongoingActivityNoti.chipBgColor", primaryColor)
+            putString("android.ongoingActivityNoti.chipExpandedText", displayTitle)
+            // Samsung One UI Custom Chronometer RemoteViews
+            putParcelable("android.ongoingActivityNoti.chronometerRemoteView", collapsedView)
+            putInt("android.ongoingActivityNoti.chronometerRemoteViewPosition", 1)
+            putString("android.ongoingActivityNoti.chronometerRemoteViewTag", "ongoing_remote_views_tag")
+            putInt("android.ongoingActivityNoti.nowbarChronometerPosition", 1)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 putParcelable(
                     "android.ongoingActivityNoti.chipIcon",
@@ -188,6 +211,9 @@ object ClockNotificationManager {
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_CLOCK)
             .setSmallIcon(R.drawable.ic_stat_clock)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(collapsedView)
+            .setCustomBigContentView(expandedView)
             .setContentTitle(displayTitle)
             .setContentText(contentText)
             .setSubText(context.getString(R.string.clock_notification_org_clock))
