@@ -6,36 +6,100 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
 
-    <Chronometer
-        android:id="@+id/notification_chronometer"
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <Chronometer
+            android:id="@+id/notification_chronometer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.Compat.Notification.Title"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false" />
+
+        <TextView
+            android:id="@+id/notification_task_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification.Title"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/notification_task_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification.Line2"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/notification_actions_layout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="@style/TextAppearance.Compat.Notification.Title"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:includeFontPadding="false" />
+        android:layout_marginStart="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/notification_task_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textAppearance="@style/TextAppearance.Compat.Notification.Title"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/notification_action_done"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/notification_button_done_bg"
+            android:src="@drawable/ic_action_done"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:focusable="false"
+            android:contentDescription="@string/clock_out_and_done" />
 
-    <TextView
-        android:id="@+id/notification_task_subtitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="1dp"
-        android:textAppearance="@style/TextAppearance.Compat.Notification.Line2"
-        android:textSize="12sp"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        <ImageButton
+            android:id="@+id/notification_action_pause_resume"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/notification_button_bg"
+            android:src="@drawable/ic_action_pause"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:focusable="false"
+            android:contentDescription="@string/pause_clock" />
+
+        <ImageButton
+            android:id="@+id/notification_action_stop"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/notification_button_bg"
+            android:src="@drawable/ic_action_stop"
+            android:scaleType="fitCenter"
+            android:padding="9dp"
+            android:focusable="false"
+            android:contentDescription="@string/clock_out" />
+
+        <ImageButton
+            android:id="@+id/notification_action_cancel"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/notification_button_bg"
+            android:src="@drawable/ic_action_cancel"
+            android:scaleType="fitCenter"
+            android:padding="9dp"
+            android:focusable="false"
+            android:contentDescription="@string/cancel" />
+    </LinearLayout>
 
 </LinearLayout>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 The Viber <theviber707@proton.me>
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<resources>
+    <!-- Notification Action Button Colors (Dark Theme) -->
+    <color name="notification_btn_bg">#29FFFFFF</color>
+    <color name="notification_btn_bg_done">#FF7F67BE</color>
+    <color name="notification_btn_icon">#FFE6E1E5</color>
+    <color name="notification_btn_icon_done">#FFFFFFFF</color>
+    <color name="notification_ripple">#40FFFFFF</color>
+</resources>

@@ -179,18 +179,6 @@ object ClockNotificationManager {
             rawContentText
         }
 
-        // Custom RemoteViews with prominent live ticking Chronometer (matching stopwatch UI)
-        val collapsedView = RemoteViews(context.packageName, R.layout.notification_clock).apply {
-            setChronometer(R.id.notification_chronometer, chronometerBase, null, !isPaused)
-            setTextViewText(R.id.notification_task_title, displayTitle)
-            setTextViewText(R.id.notification_task_subtitle, contentText)
-        }
-        val expandedView = RemoteViews(context.packageName, R.layout.notification_clock_expanded).apply {
-            setChronometer(R.id.notification_chronometer, chronometerBase, null, !isPaused)
-            setTextViewText(R.id.notification_task_title, displayTitle)
-            setTextViewText(R.id.notification_task_subtitle, contentText)
-        }
-
         // Tap notification to open MainActivity
         val contentIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -288,16 +276,38 @@ object ClockNotificationManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Custom RemoteViews with prominent live ticking Chronometer and icon buttons
+        val collapsedView = RemoteViews(context.packageName, R.layout.notification_clock)
+        val expandedView = RemoteViews(context.packageName, R.layout.notification_clock_expanded)
+
+        listOf(collapsedView, expandedView).forEach { view ->
+            view.setChronometer(R.id.notification_chronometer, chronometerBase, null, !isPaused)
+            view.setTextViewText(R.id.notification_task_title, displayTitle)
+            view.setTextViewText(R.id.notification_task_subtitle, contentText)
+            view.setImageViewResource(
+                R.id.notification_action_pause_resume,
+                if (isPaused) R.drawable.ic_action_play else R.drawable.ic_action_pause
+            )
+            view.setContentDescription(
+                R.id.notification_action_pause_resume,
+                if (isPaused) context.getString(R.string.resume_clock) else context.getString(R.string.pause_clock)
+            )
+            view.setOnClickPendingIntent(R.id.notification_action_done, clockOutAndDonePendingIntent)
+            view.setOnClickPendingIntent(R.id.notification_action_pause_resume, pauseOrResumePendingIntent)
+            view.setOnClickPendingIntent(R.id.notification_action_stop, clockOutPendingIntent)
+            view.setOnClickPendingIntent(R.id.notification_action_cancel, cancelPendingIntent)
+        }
+
         val primaryColor = 0xFF6650A4.toInt()
 
         // Samsung One UI 7 Now Bar and Android 16 Live Updates configuration bundle
         val extras = Bundle().apply {
             // Samsung One UI 7 Live Notifications & Now Bar
             putInt("android.ongoingActivityNoti.style", 1)
-            putInt("android.ongoingActivityNoti.actionType", 1)
+            putInt("android.ongoingActivityNoti.actionType", 0)
             putInt("android.ongoingActivityNoti.actionPrimarySet", 0)
             putString("android.ongoingActivityNoti.primaryInfo", displayTitle)
-            putString("android.ongoingActivityNoti.secondaryInfo", contentText)
+            putString("android.ongoingActivityNoti.secondaryInfo", "")
             putString("android.ongoingActivityNoti.nowbarPrimaryInfo", displayTitle)
             putString("android.ongoingActivityNoti.nowbarSecondaryInfo", contentText)
             putInt("android.ongoingActivityNoti.chipBgColor", primaryColor)
@@ -322,6 +332,36 @@ object ClockNotificationManager {
                 putBoolean("android.ongoingActivityNoti.isPaused", true)
             }
         }
+
+        val wearableExtender = NotificationCompat.WearableExtender()
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_action_done,
+                    context.getString(R.string.clock_out_and_done),
+                    clockOutAndDonePendingIntent
+                ).build()
+            )
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    if (isPaused) R.drawable.ic_action_play else R.drawable.ic_action_pause,
+                    if (isPaused) context.getString(R.string.resume_clock) else context.getString(R.string.pause_clock),
+                    pauseOrResumePendingIntent
+                ).build()
+            )
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_action_stop,
+                    context.getString(R.string.clock_out),
+                    clockOutPendingIntent
+                ).build()
+            )
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_action_cancel,
+                    context.getString(R.string.cancel),
+                    cancelPendingIntent
+                ).build()
+            )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_CLOCK)
             .setSmallIcon(R.drawable.ic_stat_clock)
@@ -350,26 +390,7 @@ object ClockNotificationManager {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setColor(primaryColor)
             .setContentIntent(contentPendingIntent)
-            .addAction(
-                R.drawable.ic_action_done,
-                context.getString(R.string.clock_out_and_done),
-                clockOutAndDonePendingIntent
-            )
-            .addAction(
-                if (isPaused) R.drawable.ic_action_play else R.drawable.ic_action_pause,
-                if (isPaused) context.getString(R.string.resume_clock) else context.getString(R.string.pause_clock),
-                pauseOrResumePendingIntent
-            )
-            .addAction(
-                R.drawable.ic_action_stop,
-                context.getString(R.string.clock_out),
-                clockOutPendingIntent
-            )
-            .addAction(
-                R.drawable.ic_action_cancel,
-                context.getString(R.string.cancel),
-                cancelPendingIntent
-            )
+            .extend(wearableExtender)
             .addExtras(extras)
 
         // Android 16 Live Updates promoted ongoing method (reflection for forward compatibility)
