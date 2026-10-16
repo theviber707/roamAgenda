@@ -38,6 +38,8 @@ object ClockNotificationManager {
     const val CHANNEL_ID_CLOCK = "active_clock_channel"
 
     const val ACTION_CLOCK_OUT_AND_DONE = "com.roamagenda.action.CLOCK_OUT_AND_DONE"
+    const val ACTION_CLOCK_PAUSE = "com.roamagenda.action.CLOCK_PAUSE"
+    const val ACTION_CLOCK_RESUME = "com.roamagenda.action.CLOCK_RESUME"
     const val ACTION_CLOCK_OUT = "com.roamagenda.action.CLOCK_OUT"
     const val ACTION_CLOCK_CANCEL = "com.roamagenda.action.CLOCK_CANCEL"
 
@@ -47,6 +49,63 @@ object ClockNotificationManager {
     const val EXTRA_TASK_TITLE = "extra_task_title"
     const val EXTRA_TASK_TODO_KEYWORD = "extra_task_todo_keyword"
     const val EXTRA_TASK_FILE_TITLE = "extra_task_file_title"
+
+    data class ClockSession(
+        val filePath: String,
+        val lineNumber: Int,
+        val title: String,
+        val fileTitle: String,
+        val priority: Char,
+        val todoKeyword: String,
+        val isPaused: Boolean,
+        val accumulatedSeconds: Long
+    )
+
+    private const val PREFS_NAME = "clock_session"
+    private const val KEY_FILE_PATH = "file_path"
+    private const val KEY_LINE_NUMBER = "line_number"
+    private const val KEY_TITLE = "title"
+    private const val KEY_FILE_TITLE = "file_title"
+    private const val KEY_PRIORITY = "priority"
+    private const val KEY_TODO_KEYWORD = "todo_keyword"
+    private const val KEY_IS_PAUSED = "is_paused"
+    private const val KEY_ACCUMULATED_SECONDS = "accumulated_seconds"
+
+    fun saveSession(context: Context, session: ClockSession) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_FILE_PATH, session.filePath)
+            .putInt(KEY_LINE_NUMBER, session.lineNumber)
+            .putString(KEY_TITLE, session.title)
+            .putString(KEY_FILE_TITLE, session.fileTitle)
+            .putString(KEY_PRIORITY, session.priority.toString())
+            .putString(KEY_TODO_KEYWORD, session.todoKeyword)
+            .putBoolean(KEY_IS_PAUSED, session.isPaused)
+            .putLong(KEY_ACCUMULATED_SECONDS, session.accumulatedSeconds)
+            .apply()
+    }
+
+    fun getSession(context: Context): ClockSession? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val path = prefs.getString(KEY_FILE_PATH, null) ?: return null
+        val line = prefs.getInt(KEY_LINE_NUMBER, -1)
+        if (line == -1) return null
+        return ClockSession(
+            filePath = path,
+            lineNumber = line,
+            title = prefs.getString(KEY_TITLE, "") ?: "",
+            fileTitle = prefs.getString(KEY_FILE_TITLE, "") ?: "",
+            priority = prefs.getString(KEY_PRIORITY, "A")?.firstOrNull() ?: 'A',
+            todoKeyword = prefs.getString(KEY_TODO_KEYWORD, "TODO") ?: "TODO",
+            isPaused = prefs.getBoolean(KEY_IS_PAUSED, false),
+            accumulatedSeconds = prefs.getLong(KEY_ACCUMULATED_SECONDS, 0L)
+        )
+    }
+
+    fun clearSession(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+    }
 
     private val _clockEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val clockEvents: SharedFlow<Unit> = _clockEvents.asSharedFlow()
@@ -86,16 +145,27 @@ object ClockNotificationManager {
     /**
      * Builds the NotificationCompat.Builder for an ongoing clock notification.
      */
-    fun buildNotification(context: Context, task: RoamTask): NotificationCompat.Builder {
+    fun buildNotification(
+        context: Context,
+        task: RoamTask,
+        isPaused: Boolean = false,
+        accumulatedSeconds: Long = 0L
+    ): NotificationCompat.Builder {
         val nowEpoch = System.currentTimeMillis()
         val startTimeMillis = task.clockStartTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
             ?: nowEpoch
-        val elapsedMillis = (nowEpoch - startTimeMillis).coerceAtLeast(0L)
-        val chronometerBase = SystemClock.elapsedRealtime() - elapsedMillis
+
+        val chronometerBase = if (isPaused) {
+            SystemClock.elapsedRealtime() - (accumulatedSeconds * 1000L)
+        } else {
+            val currentSegmentMillis = (nowEpoch - startTimeMillis).coerceAtLeast(0L)
+            val totalElapsedMillis = (accumulatedSeconds * 1000L) + currentSegmentMillis
+            SystemClock.elapsedRealtime() - totalElapsedMillis
+        }
 
         val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
 
-        val contentText = if (task.steps.isNotEmpty()) {
+        val rawContentText = if (task.steps.isNotEmpty()) {
             val completed = task.steps.count { it.isChecked }
             val stepsProgress = context.getString(R.string.steps_progress, completed, task.steps.size)
             if (task.fileTitle.isNotBlank()) "$stepsProgress • ${task.fileTitle}" else stepsProgress
@@ -103,14 +173,20 @@ object ClockNotificationManager {
             task.fileTitle.ifBlank { context.getString(R.string.app_name) }
         }
 
+        val contentText = if (isPaused) {
+            "${context.getString(R.string.clock_paused)} • $rawContentText"
+        } else {
+            rawContentText
+        }
+
         // Custom RemoteViews with prominent live ticking Chronometer (matching stopwatch UI)
         val collapsedView = RemoteViews(context.packageName, R.layout.notification_clock).apply {
-            setChronometer(R.id.notification_chronometer, chronometerBase, null, true)
+            setChronometer(R.id.notification_chronometer, chronometerBase, null, !isPaused)
             setTextViewText(R.id.notification_task_title, displayTitle)
             setTextViewText(R.id.notification_task_subtitle, contentText)
         }
         val expandedView = RemoteViews(context.packageName, R.layout.notification_clock_expanded).apply {
-            setChronometer(R.id.notification_chronometer, chronometerBase, null, true)
+            setChronometer(R.id.notification_chronometer, chronometerBase, null, !isPaused)
             setTextViewText(R.id.notification_task_title, displayTitle)
             setTextViewText(R.id.notification_task_subtitle, contentText)
         }
@@ -143,7 +219,42 @@ object ClockNotificationManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action 2: Clock Out
+        // Action 2: Pause or Resume
+        val pauseOrResumePendingIntent = if (isPaused) {
+            val resumeIntent = Intent(context, ClockActionReceiver::class.java).apply {
+                action = ACTION_CLOCK_RESUME
+                putExtra(EXTRA_TASK_FILE_PATH, task.filePath)
+                putExtra(EXTRA_TASK_LINE_NUMBER, task.lineNumber)
+                putExtra(EXTRA_TASK_PRIORITY, task.priority)
+                putExtra(EXTRA_TASK_TITLE, task.title)
+                putExtra(EXTRA_TASK_TODO_KEYWORD, task.todoKeyword)
+                putExtra(EXTRA_TASK_FILE_TITLE, task.fileTitle)
+            }
+            PendingIntent.getBroadcast(
+                context,
+                105,
+                resumeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            val pauseIntent = Intent(context, ClockActionReceiver::class.java).apply {
+                action = ACTION_CLOCK_PAUSE
+                putExtra(EXTRA_TASK_FILE_PATH, task.filePath)
+                putExtra(EXTRA_TASK_LINE_NUMBER, task.lineNumber)
+                putExtra(EXTRA_TASK_PRIORITY, task.priority)
+                putExtra(EXTRA_TASK_TITLE, task.title)
+                putExtra(EXTRA_TASK_TODO_KEYWORD, task.todoKeyword)
+                putExtra(EXTRA_TASK_FILE_TITLE, task.fileTitle)
+            }
+            PendingIntent.getBroadcast(
+                context,
+                104,
+                pauseIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        // Action 3: Clock Out / Stop
         val clockOutIntent = Intent(context, ClockActionReceiver::class.java).apply {
             action = ACTION_CLOCK_OUT
             putExtra(EXTRA_TASK_FILE_PATH, task.filePath)
@@ -160,7 +271,7 @@ object ClockNotificationManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action 3: Cancel Clock
+        // Action 4: Cancel Clock
         val cancelIntent = Intent(context, ClockActionReceiver::class.java).apply {
             action = ACTION_CLOCK_CANCEL
             putExtra(EXTRA_TASK_FILE_PATH, task.filePath)
@@ -205,8 +316,11 @@ object ClockNotificationManager {
             // Android 16 Promoted Ongoing Notification (Live Update)
             putBoolean("android.requestPromotedOngoing", true)
             // Explicitly preserve chronometer flag so OEM builders do not strip it
-            putBoolean(NotificationCompat.EXTRA_SHOW_CHRONOMETER, true)
-            putBoolean("android.showChronometer", true)
+            putBoolean(NotificationCompat.EXTRA_SHOW_CHRONOMETER, !isPaused)
+            putBoolean("android.showChronometer", !isPaused)
+            if (isPaused) {
+                putBoolean("android.ongoingActivityNoti.isPaused", true)
+            }
         }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_CLOCK)
@@ -216,11 +330,19 @@ object ClockNotificationManager {
             .setCustomBigContentView(expandedView)
             .setContentTitle(displayTitle)
             .setContentText(contentText)
-            .setSubText(context.getString(R.string.clock_notification_org_clock))
-            .setUsesChronometer(true)
+            .setSubText(
+                if (isPaused) "${context.getString(R.string.clock_notification_org_clock)} • ${context.getString(R.string.clock_paused)}"
+                else context.getString(R.string.clock_notification_org_clock)
+            )
+            .setUsesChronometer(!isPaused)
             .setChronometerCountDown(false)
-            .setShowWhen(true)
-            .setWhen(startTimeMillis)
+            .setShowWhen(!isPaused)
+            .apply {
+                if (!isPaused) {
+                    val totalElapsed = (accumulatedSeconds * 1000L) + (nowEpoch - startTimeMillis).coerceAtLeast(0L)
+                    setWhen(nowEpoch - totalElapsed)
+                }
+            }
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
@@ -232,6 +354,11 @@ object ClockNotificationManager {
                 R.drawable.ic_action_done,
                 context.getString(R.string.clock_out_and_done),
                 clockOutAndDonePendingIntent
+            )
+            .addAction(
+                if (isPaused) R.drawable.ic_action_play else R.drawable.ic_action_pause,
+                if (isPaused) context.getString(R.string.resume_clock) else context.getString(R.string.pause_clock),
+                pauseOrResumePendingIntent
             )
             .addAction(
                 R.drawable.ic_action_stop,
@@ -281,7 +408,12 @@ object ClockNotificationManager {
     /**
      * Shows or updates the ongoing clock notification.
      */
-    fun show(context: Context, task: RoamTask) {
+    fun show(
+        context: Context,
+        task: RoamTask,
+        isPaused: Boolean = false,
+        accumulatedSeconds: Long = 0L
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     context,
@@ -297,7 +429,7 @@ object ClockNotificationManager {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val builder = buildNotification(context, task)
+        val builder = buildNotification(context, task, isPaused, accumulatedSeconds)
         notificationManager.notify(NOTIFICATION_ID_CLOCK, builder.build())
     }
 

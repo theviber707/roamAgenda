@@ -14,10 +14,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.Duration
+import java.time.LocalDateTime
 
 /**
  * Handles actions from the ongoing clock notification:
  * - "Clock Out & Done"
+ * - "Pause"
+ * - "Resume"
  * - "Clock Out"
  * - "Cancel Clock"
  */
@@ -58,19 +62,83 @@ class ClockActionReceiver : BroadcastReceiver() {
                 }
 
                 when (action) {
-                    ClockNotificationManager.ACTION_CLOCK_OUT_AND_DONE -> {
-                        RoamAgendaParser.markTaskDone(fullTask)
-                    }
-                    ClockNotificationManager.ACTION_CLOCK_OUT -> {
+                    ClockNotificationManager.ACTION_CLOCK_PAUSE -> {
+                        val session = ClockNotificationManager.getSession(context)
+                        val priorAccumulated = session?.accumulatedSeconds ?: 0L
+                        val segmentSecs = fullTask.clockStartTime?.let {
+                            Duration.between(it, LocalDateTime.now()).seconds.coerceAtLeast(0L)
+                        } ?: 0L
+                        val totalAccumulated = priorAccumulated + segmentSecs
+
                         RoamAgendaParser.clockOut(fullTask)
+
+                        val updatedSession = ClockNotificationManager.ClockSession(
+                            filePath = fullTask.filePath,
+                            lineNumber = fullTask.lineNumber,
+                            title = fullTask.title,
+                            fileTitle = fullTask.fileTitle,
+                            priority = fullTask.priority,
+                            todoKeyword = fullTask.todoKeyword,
+                            isPaused = true,
+                            accumulatedSeconds = totalAccumulated
+                        )
+                        ClockNotificationManager.saveSession(context, updatedSession)
+                        ClockNotificationManager.show(context, fullTask, isPaused = true, accumulatedSeconds = totalAccumulated)
+                        ClockNotificationManager.notifyClockStateChanged()
                     }
+
+                    ClockNotificationManager.ACTION_CLOCK_RESUME -> {
+                        val session = ClockNotificationManager.getSession(context)
+                        val accumulated = session?.accumulatedSeconds ?: 0L
+
+                        RoamAgendaParser.clockIn(fullTask)
+
+                        val now = LocalDateTime.now()
+                        val updatedSession = ClockNotificationManager.ClockSession(
+                            filePath = fullTask.filePath,
+                            lineNumber = fullTask.lineNumber,
+                            title = fullTask.title,
+                            fileTitle = fullTask.fileTitle,
+                            priority = fullTask.priority,
+                            todoKeyword = fullTask.todoKeyword,
+                            isPaused = false,
+                            accumulatedSeconds = accumulated
+                        )
+                        ClockNotificationManager.saveSession(context, updatedSession)
+                        val resumedTask = fullTask.copy(isClockedIn = true, clockStartTime = now)
+                        ClockNotificationManager.show(context, resumedTask, isPaused = false, accumulatedSeconds = accumulated)
+                        ClockNotificationManager.notifyClockStateChanged()
+                    }
+
+                    ClockNotificationManager.ACTION_CLOCK_OUT_AND_DONE -> {
+                        if (fullTask.isClockedIn) {
+                            RoamAgendaParser.clockOut(fullTask)
+                        }
+                        RoamAgendaParser.markTaskDone(fullTask)
+                        ClockNotificationManager.clearSession(context)
+                        ClockNotificationManager.cancel(context)
+                        ClockNotificationManager.notifyClockStateChanged()
+                    }
+
+                    ClockNotificationManager.ACTION_CLOCK_OUT -> {
+                        if (fullTask.isClockedIn) {
+                            RoamAgendaParser.clockOut(fullTask)
+                        }
+                        ClockNotificationManager.clearSession(context)
+                        ClockNotificationManager.cancel(context)
+                        ClockNotificationManager.notifyClockStateChanged()
+                    }
+
                     ClockNotificationManager.ACTION_CLOCK_CANCEL -> {
-                        RoamAgendaParser.cancelClock(fullTask)
+                        if (fullTask.isClockedIn) {
+                            RoamAgendaParser.cancelClock(fullTask)
+                        }
+                        ClockNotificationManager.clearSession(context)
+                        ClockNotificationManager.cancel(context)
+                        ClockNotificationManager.notifyClockStateChanged()
                     }
                 }
             } finally {
-                ClockNotificationManager.cancel(context)
-                ClockNotificationManager.notifyClockStateChanged()
                 pendingResult.finish()
             }
         }

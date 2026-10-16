@@ -14,6 +14,10 @@
 
     <!-- Active Clock Banner -->
     <string name="clocked_banner">Cronômetro: %1$s</string>
+    <string name="clocked_banner_paused">Pausado: %1$s</string>
+    <string name="pause_clock">Pausar</string>
+    <string name="resume_clock">Retomar</string>
+    <string name="clock_paused">Pausado</string>
     <string name="clock_out_button">Parar</string>
     <string name="cancel_clock">Cancelar cronômetro</string>
 
@@ -54,6 +58,8 @@
     <string name="undo">Desfazer</string>
     <string name="restored_task">Restaurada: %1$s</string>
     <string name="clocked_in_msg">Cronometrando: %1$s</string>
+    <string name="clock_paused_msg">Cronômetro pausado: %1$s</string>
+    <string name="clock_resumed_msg">Cronômetro retomado: %1$s</string>
     <string name="clocked_out_msg">Cronômetro finalizado: %1$s</string>
     <string name="clock_cancelled_msg">Cronômetro cancelado</string>
     <string name="failed_to_clock_in">Falha ao iniciar cronômetro</string>

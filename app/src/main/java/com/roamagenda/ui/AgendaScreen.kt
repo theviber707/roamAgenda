@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
@@ -51,9 +53,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -242,7 +247,11 @@ fun AgendaScreen(
                             uiState.activeClockedTask?.let { clockedTask ->
                                 ActiveClockBanner(
                                     task = clockedTask,
+                                    isPaused = uiState.isClockPaused,
+                                    accumulatedSeconds = uiState.accumulatedClockSeconds,
                                     onClockOutAndDone = { viewModel.markTaskDone(clockedTask) },
+                                    onPauseClock = { viewModel.pauseClock(clockedTask) },
+                                    onResumeClock = { viewModel.resumeClock(clockedTask) },
                                     onClockOut = { viewModel.clockOut(clockedTask) },
                                     onCancelClock = { viewModel.cancelClock(clockedTask) }
                                 )
@@ -499,25 +508,39 @@ private fun EmptyStateView(
 @Composable
 private fun ActiveClockBanner(
     task: RoamTask,
+    isPaused: Boolean,
+    accumulatedSeconds: Long,
     onClockOutAndDone: () -> Unit,
+    onPauseClock: () -> Unit,
+    onResumeClock: () -> Unit,
     onClockOut: () -> Unit,
     onCancelClock: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val clockStartTime = task.clockStartTime
-    var elapsedSeconds by remember(clockStartTime) {
-        val initial = if (clockStartTime != null) {
-            java.time.Duration.between(clockStartTime, java.time.LocalDateTime.now()).seconds.coerceAtLeast(0L)
-        } else 0L
+    var elapsedSeconds by remember(clockStartTime, isPaused, accumulatedSeconds) {
+        val initial = if (isPaused) {
+            accumulatedSeconds
+        } else {
+            val segment = if (clockStartTime != null) {
+                java.time.Duration.between(clockStartTime, java.time.LocalDateTime.now()).seconds.coerceAtLeast(0L)
+            } else 0L
+            accumulatedSeconds + segment
+        }
         mutableLongStateOf(initial)
     }
 
-    LaunchedEffect(clockStartTime) {
-        while (true) {
-            if (clockStartTime != null) {
-                elapsedSeconds = java.time.Duration.between(clockStartTime, java.time.LocalDateTime.now()).seconds.coerceAtLeast(0L)
+    LaunchedEffect(clockStartTime, isPaused, accumulatedSeconds) {
+        if (!isPaused) {
+            while (true) {
+                val segment = if (clockStartTime != null) {
+                    java.time.Duration.between(clockStartTime, java.time.LocalDateTime.now()).seconds.coerceAtLeast(0L)
+                } else 0L
+                elapsedSeconds = accumulatedSeconds + segment
+                delay(1000L)
             }
-            delay(1000L)
+        } else {
+            elapsedSeconds = accumulatedSeconds
         }
     }
 
@@ -534,7 +557,7 @@ private fun ActiveClockBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -544,7 +567,7 @@ private fun ActiveClockBanner(
                 modifier = Modifier.size(24.dp)
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(
                 modifier = Modifier.weight(1f)
@@ -557,7 +580,11 @@ private fun ActiveClockBanner(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = stringResource(R.string.clocked_banner, formatElapsedSeconds(elapsedSeconds)),
+                    text = if (isPaused) {
+                        stringResource(R.string.clocked_banner_paused, formatElapsedSeconds(elapsedSeconds))
+                    } else {
+                        stringResource(R.string.clocked_banner, formatElapsedSeconds(elapsedSeconds))
+                    },
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Medium
@@ -566,48 +593,58 @@ private fun ActiveClockBanner(
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-            Button(
+            // Action 1: Done (Icon-only)
+            FilledIconButton(
                 onClick = onClockOutAndDone,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                colors = ButtonDefaults.buttonColors(
+                modifier = Modifier.size(36.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = stringResource(R.string.clock_out_and_done),
-                    style = MaterialTheme.typography.labelMedium
+                    contentDescription = stringResource(R.string.clock_out_and_done),
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            FilledTonalButton(
+            // Action 2: Pause / Resume (Icon-only)
+            FilledTonalIconButton(
+                onClick = if (isPaused) onResumeClock else onPauseClock,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    contentDescription = if (isPaused) stringResource(R.string.resume_clock) else stringResource(R.string.pause_clock),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Action 3: Stop / Clock Out (Icon-only)
+            FilledTonalIconButton(
                 onClick = onClockOut,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Stop,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                    contentDescription = stringResource(R.string.clock_out),
+                    modifier = Modifier.size(18.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.clock_out_button), style = MaterialTheme.typography.labelMedium)
             }
 
             Spacer(modifier = Modifier.width(4.dp))
 
+            // Action 4: Cancel (Icon-only)
             IconButton(
                 onClick = onCancelClock,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,

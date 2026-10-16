@@ -14,6 +14,10 @@
 
     <!-- Active Clock Banner -->
     <string name="clocked_banner">Clocked: %1$s</string>
+    <string name="clocked_banner_paused">Paused: %1$s</string>
+    <string name="pause_clock">Pause</string>
+    <string name="resume_clock">Resume</string>
+    <string name="clock_paused">Paused</string>
     <string name="clock_out_button">Out</string>
     <string name="cancel_clock">Cancel Clock</string>
 
@@ -54,6 +58,8 @@
     <string name="undo">Undo</string>
     <string name="restored_task">Restored: %1$s</string>
     <string name="clocked_in_msg">Clocked in: %1$s</string>
+    <string name="clock_paused_msg">Clock paused: %1$s</string>
+    <string name="clock_resumed_msg">Clock resumed: %1$s</string>
     <string name="clocked_out_msg">Clocked out: %1$s</string>
     <string name="clock_cancelled_msg">Clock cancelled</string>
     <string name="failed_to_clock_in">Failed to clock in</string>

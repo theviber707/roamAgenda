@@ -67,6 +67,8 @@ data class AgendaUiState(
     val error: AgendaError? = null,
     val lastCompletedRecord: CompletedTaskRecord? = null,
     val activeClockedTask: RoamTask? = null,
+    val isClockPaused: Boolean = false,
+    val accumulatedClockSeconds: Long = 0L,
     val collapsedPriorities: Set<Char> = emptySet()
 )
 
@@ -151,7 +153,9 @@ class AgendaViewModel(
     fun onNotificationPermissionGranted() {
         val activeClocked = _uiState.value.activeClockedTask
         if (activeClocked != null) {
-            ClockNotificationManager.show(getApplication(), activeClocked)
+            val isPaused = _uiState.value.isClockPaused
+            val accumulated = _uiState.value.accumulatedClockSeconds
+            ClockNotificationManager.show(getApplication(), activeClocked, isPaused, accumulated)
         }
     }
 
@@ -208,11 +212,46 @@ class AgendaViewModel(
                     val visible = filterVisibleTasks(result.tasks, showFuture)
                     val grouped = visible.groupBy { it.priority }.toSortedMap()
 
-                    val activeClocked = result.tasks.firstOrNull { it.isClockedIn }
-                    if (activeClocked != null) {
-                        ClockNotificationManager.show(getApplication(), activeClocked)
-                    } else {
-                        ClockNotificationManager.cancel(getApplication())
+                    val activeRunningTask = result.tasks.firstOrNull { it.isClockedIn }
+                    val session = ClockNotificationManager.getSession(getApplication())
+
+                    val (effectiveTask, isPaused, accumulated) = when {
+                        activeRunningTask != null -> {
+                            val acc = if (session != null && session.filePath == activeRunningTask.filePath && session.lineNumber == activeRunningTask.lineNumber) {
+                                session.accumulatedSeconds
+                            } else {
+                                0L
+                            }
+                            val newSession = ClockNotificationManager.ClockSession(
+                                filePath = activeRunningTask.filePath,
+                                lineNumber = activeRunningTask.lineNumber,
+                                title = activeRunningTask.title,
+                                fileTitle = activeRunningTask.fileTitle,
+                                priority = activeRunningTask.priority,
+                                todoKeyword = activeRunningTask.todoKeyword,
+                                isPaused = false,
+                                accumulatedSeconds = acc
+                            )
+                            ClockNotificationManager.saveSession(getApplication(), newSession)
+                            ClockNotificationManager.show(getApplication(), activeRunningTask, isPaused = false, accumulatedSeconds = acc)
+                            Triple(activeRunningTask, false, acc)
+                        }
+                        session != null && session.isPaused -> {
+                            val pausedTask = result.tasks.firstOrNull { it.filePath == session.filePath && it.lineNumber == session.lineNumber }
+                            if (pausedTask != null) {
+                                ClockNotificationManager.show(getApplication(), pausedTask, isPaused = true, accumulatedSeconds = session.accumulatedSeconds)
+                                Triple(pausedTask, true, session.accumulatedSeconds)
+                            } else {
+                                ClockNotificationManager.clearSession(getApplication())
+                                ClockNotificationManager.cancel(getApplication())
+                                Triple(null, false, 0L)
+                            }
+                        }
+                        else -> {
+                            ClockNotificationManager.clearSession(getApplication())
+                            ClockNotificationManager.cancel(getApplication())
+                            Triple(null, false, 0L)
+                        }
                     }
 
                     _uiState.update {
@@ -225,12 +264,15 @@ class AgendaViewModel(
                             totalFilesScanned = result.totalFilesScanned,
                             agendaFilesCount = result.agendaFilesFound,
                             error = null,
-                            activeClockedTask = activeClocked
+                            activeClockedTask = effectiveTask,
+                            isClockPaused = isPaused,
+                            accumulatedClockSeconds = accumulated
                         )
                     }
                 }
 
                 is ParseResult.DirectoryNotFound -> {
+                    ClockNotificationManager.clearSession(getApplication())
                     ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
@@ -240,12 +282,15 @@ class AgendaViewModel(
                             tasksByPriority = emptyMap(),
                             totalTaskCount = 0,
                             error = AgendaError.DirectoryNotFound(result.path),
-                            activeClockedTask = null
+                            activeClockedTask = null,
+                            isClockPaused = false,
+                            accumulatedClockSeconds = 0L
                         )
                     }
                 }
 
                 is ParseResult.NotADirectory -> {
+                    ClockNotificationManager.clearSession(getApplication())
                     ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
@@ -254,12 +299,16 @@ class AgendaViewModel(
                             rawTasks = emptyList(),
                             tasksByPriority = emptyMap(),
                             totalTaskCount = 0,
-                            error = AgendaError.NotADirectory(result.path)
+                            error = AgendaError.NotADirectory(result.path),
+                            activeClockedTask = null,
+                            isClockPaused = false,
+                            accumulatedClockSeconds = 0L
                         )
                     }
                 }
 
                 is ParseResult.NoOrgFilesFound -> {
+                    ClockNotificationManager.clearSession(getApplication())
                     ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
@@ -268,12 +317,16 @@ class AgendaViewModel(
                             rawTasks = emptyList(),
                             tasksByPriority = emptyMap(),
                             totalTaskCount = 0,
-                            error = AgendaError.NoOrgFilesFound(result.path)
+                            error = AgendaError.NoOrgFilesFound(result.path),
+                            activeClockedTask = null,
+                            isClockPaused = false,
+                            accumulatedClockSeconds = 0L
                         )
                     }
                 }
 
                 is ParseResult.Error -> {
+                    ClockNotificationManager.clearSession(getApplication())
                     ClockNotificationManager.cancel(getApplication())
                     _uiState.update {
                         it.copy(
@@ -282,7 +335,10 @@ class AgendaViewModel(
                             rawTasks = emptyList(),
                             tasksByPriority = emptyMap(),
                             totalTaskCount = 0,
-                            error = AgendaError.Generic(result.message)
+                            error = AgendaError.Generic(result.message),
+                            activeClockedTask = null,
+                            isClockPaused = false,
+                            accumulatedClockSeconds = 0L
                         )
                     }
                 }
@@ -333,6 +389,17 @@ class AgendaViewModel(
                     totalTaskCount = (it.totalTaskCount - 1).coerceAtLeast(0),
                     lastCompletedRecord = record
                 )
+            }
+
+            val isCurrentActive = _uiState.value.activeClockedTask?.id == task.id
+            if (isCurrentActive) {
+                withContext(Dispatchers.IO) {
+                    if (task.isClockedIn) {
+                        RoamAgendaParser.clockOut(task)
+                    }
+                }
+                ClockNotificationManager.clearSession(getApplication())
+                ClockNotificationManager.cancel(getApplication())
             }
 
             val success = withContext(Dispatchers.IO) {
@@ -444,6 +511,10 @@ class AgendaViewModel(
                 }
             }
 
+            // Fresh clock-in: clear any prior session state
+            ClockNotificationManager.clearSession(getApplication())
+            _uiState.update { it.copy(accumulatedClockSeconds = 0L, isClockPaused = false) }
+
             val success = withContext(Dispatchers.IO) {
                 RoamAgendaParser.clockIn(task)
             }
@@ -459,16 +530,114 @@ class AgendaViewModel(
     }
 
     /**
-     * Clocks out of [task] and saves closed clock duration.
+     * Pauses the active clock on [task], closing the current clock segment on disk
+     * and freezing accumulated session time.
      */
-    fun clockOut(task: RoamTask) {
+    fun pauseClock(task: RoamTask) {
         viewModelScope.launch {
+            val currentStartTime = task.clockStartTime
+            val segmentSecs = if (currentStartTime != null) {
+                java.time.Duration.between(currentStartTime, java.time.LocalDateTime.now()).seconds.coerceAtLeast(0L)
+            } else 0L
+            val totalAccumulated = _uiState.value.accumulatedClockSeconds + segmentSecs
+
             val success = withContext(Dispatchers.IO) {
                 RoamAgendaParser.clockOut(task)
             }
 
             if (success) {
+                val session = ClockNotificationManager.ClockSession(
+                    filePath = task.filePath,
+                    lineNumber = task.lineNumber,
+                    title = task.title,
+                    fileTitle = task.fileTitle,
+                    priority = task.priority,
+                    todoKeyword = task.todoKeyword,
+                    isPaused = true,
+                    accumulatedSeconds = totalAccumulated
+                )
+                ClockNotificationManager.saveSession(getApplication(), session)
+                ClockNotificationManager.show(getApplication(), task, isPaused = true, accumulatedSeconds = totalAccumulated)
+                _uiState.update {
+                    it.copy(
+                        isClockPaused = true,
+                        accumulatedClockSeconds = totalAccumulated
+                    )
+                }
+                val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clock_paused_msg, listOf(displayTitle)))
+                refreshTasks(isSilent = true)
+            } else {
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_clock_out))
+            }
+        }
+    }
+
+    /**
+     * Resumes a paused clock on [task], opening a new clock segment on disk
+     * and continuing from accumulated session time.
+     */
+    fun resumeClock(task: RoamTask) {
+        viewModelScope.launch {
+            val accumulated = _uiState.value.accumulatedClockSeconds
+            val success = withContext(Dispatchers.IO) {
+                RoamAgendaParser.clockIn(task)
+            }
+
+            if (success) {
+                val now = java.time.LocalDateTime.now()
+                val session = ClockNotificationManager.ClockSession(
+                    filePath = task.filePath,
+                    lineNumber = task.lineNumber,
+                    title = task.title,
+                    fileTitle = task.fileTitle,
+                    priority = task.priority,
+                    todoKeyword = task.todoKeyword,
+                    isPaused = false,
+                    accumulatedSeconds = accumulated
+                )
+                ClockNotificationManager.saveSession(getApplication(), session)
+                val resumedTask = task.copy(isClockedIn = true, clockStartTime = now)
+                ClockNotificationManager.show(getApplication(), resumedTask, isPaused = false, accumulatedSeconds = accumulated)
+                _uiState.update {
+                    it.copy(
+                        activeClockedTask = resumedTask,
+                        isClockPaused = false
+                    )
+                }
+                val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clock_resumed_msg, listOf(displayTitle)))
+                refreshTasks(isSilent = true)
+            } else {
+                _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.failed_to_clock_in))
+            }
+        }
+    }
+
+    /**
+     * Clocks out of [task] and saves closed clock duration.
+     */
+    fun clockOut(task: RoamTask) {
+        viewModelScope.launch {
+            val wasRunning = task.isClockedIn
+            val success = if (wasRunning) {
+                withContext(Dispatchers.IO) {
+                    RoamAgendaParser.clockOut(task)
+                }
+            } else {
+                true
+            }
+
+            if (success) {
+                ClockNotificationManager.clearSession(getApplication())
                 ClockNotificationManager.cancel(getApplication())
+                _uiState.update {
+                    it.copy(
+                        activeClockedTask = null,
+                        isClockPaused = false,
+                        accumulatedClockSeconds = 0L
+                    )
+                }
                 val displayTitle = RoamAgendaParser.formatOrgTitle(task.title)
                 _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clocked_out_msg, listOf(displayTitle)))
                 refreshTasks(isSilent = true)
@@ -483,12 +652,25 @@ class AgendaViewModel(
      */
     fun cancelClock(task: RoamTask) {
         viewModelScope.launch {
-            val success = withContext(Dispatchers.IO) {
-                RoamAgendaParser.cancelClock(task)
+            val wasRunning = task.isClockedIn
+            val success = if (wasRunning) {
+                withContext(Dispatchers.IO) {
+                    RoamAgendaParser.cancelClock(task)
+                }
+            } else {
+                true
             }
 
             if (success) {
+                ClockNotificationManager.clearSession(getApplication())
                 ClockNotificationManager.cancel(getApplication())
+                _uiState.update {
+                    it.copy(
+                        activeClockedTask = null,
+                        isClockPaused = false,
+                        accumulatedClockSeconds = 0L
+                    )
+                }
                 _uiEvents.emit(AgendaUiEvent.StringResMessage(R.string.clock_cancelled_msg))
                 refreshTasks(isSilent = true)
             } else {

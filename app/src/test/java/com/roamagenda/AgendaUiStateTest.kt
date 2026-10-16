@@ -28,4 +28,15 @@ class AgendaUiStateTest {
         val uncollapsedA = collapsedBoth.copy(collapsedPriorities = collapsedBoth.collapsedPriorities - 'A')
         assertEquals(setOf('B'), uncollapsedA.collapsedPriorities)
     }
+
+    @Test
+    fun testClockPausedStateInUiState() {
+        val state = AgendaUiState()
+        assertFalse(state.isClockPaused)
+        assertEquals(0L, state.accumulatedClockSeconds)
+
+        val pausedState = state.copy(isClockPaused = true, accumulatedClockSeconds = 900L)
+        assertTrue(pausedState.isClockPaused)
+        assertEquals(900L, pausedState.accumulatedClockSeconds)
+    }
 }

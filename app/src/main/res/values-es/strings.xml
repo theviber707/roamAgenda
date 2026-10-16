@@ -14,6 +14,10 @@
 
     <!-- Active Clock Banner -->
     <string name="clocked_banner">Tiempo: %1$s</string>
+    <string name="clocked_banner_paused">Pausado: %1$s</string>
+    <string name="pause_clock">Pausar</string>
+    <string name="resume_clock">Reanudar</string>
+    <string name="clock_paused">Pausado</string>
     <string name="clock_out_button">Detener</string>
     <string name="cancel_clock">Cancelar tiempo</string>
 
@@ -54,6 +58,8 @@
     <string name="undo">Deshacer</string>
     <string name="restored_task">Restaurada: %1$s</string>
     <string name="clocked_in_msg">Tiempo iniciado: %1$s</string>
+    <string name="clock_paused_msg">Tiempo pausado: %1$s</string>
+    <string name="clock_resumed_msg">Tiempo reanudado: %1$s</string>
     <string name="clocked_out_msg">Tiempo detenido: %1$s</string>
     <string name="clock_cancelled_msg">Tiempo cancelado</string>
     <string name="failed_to_clock_in">Error al iniciar tiempo</string>

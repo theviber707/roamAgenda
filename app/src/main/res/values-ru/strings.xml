@@ -14,6 +14,10 @@
 
     <!-- Active Clock Banner -->
     <string name="clocked_banner">На таймере: %1$s</string>
+    <string name="clocked_banner_paused">На паузе: %1$s</string>
+    <string name="pause_clock">Пауза</string>
+    <string name="resume_clock">Продолжить</string>
+    <string name="clock_paused">На паузе</string>
     <string name="clock_out_button">Стоп</string>
     <string name="cancel_clock">Отменить таймер</string>
 
@@ -54,6 +58,8 @@
     <string name="undo">Отменить</string>
     <string name="restored_task">Восстановлено: %1$s</string>
     <string name="clocked_in_msg">Таймер запущен: %1$s</string>
+    <string name="clock_paused_msg">Таймер приостановлен: %1$s</string>
+    <string name="clock_resumed_msg">Таймер возобновлен: %1$s</string>
     <string name="clocked_out_msg">Таймер остановлен: %1$s</string>
     <string name="clock_cancelled_msg">Таймер отменён</string>
     <string name="failed_to_clock_in">Не удалось запустить таймер</string>

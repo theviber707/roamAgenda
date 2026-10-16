@@ -26,6 +26,8 @@ class ClockNotificationTest {
         assertEquals("active_clock_channel", ClockNotificationManager.CHANNEL_ID_CLOCK)
         assertEquals(1001, ClockNotificationManager.NOTIFICATION_ID_CLOCK)
         assertEquals("com.roamagenda.action.CLOCK_OUT_AND_DONE", ClockNotificationManager.ACTION_CLOCK_OUT_AND_DONE)
+        assertEquals("com.roamagenda.action.CLOCK_PAUSE", ClockNotificationManager.ACTION_CLOCK_PAUSE)
+        assertEquals("com.roamagenda.action.CLOCK_RESUME", ClockNotificationManager.ACTION_CLOCK_RESUME)
         assertEquals("com.roamagenda.action.CLOCK_OUT", ClockNotificationManager.ACTION_CLOCK_OUT)
         assertEquals("com.roamagenda.action.CLOCK_CANCEL", ClockNotificationManager.ACTION_CLOCK_CANCEL)
         assertEquals("extra_task_file_path", ClockNotificationManager.EXTRA_TASK_FILE_PATH)
@@ -106,5 +108,57 @@ class ClockNotificationTest {
         val updatedContent = tempFile.readText()
         assertTrue("Headline should transition to DONE", updatedContent.contains("* DONE [#A] Task to clock out and finish"))
         assertTrue("Active clock should be closed with duration", updatedContent.contains("CLOCK: [2026-10-14 Wed 20:00]--[2026-10-14 Wed 20:45] =>  0:45"))
+    }
+
+    @Test
+    fun testPauseAndResumeGeneratesMultipleClockSegmentsAndSumsTotalTime() {
+        val tempFile = File.createTempFile("clock_pause_resume_test", ".org")
+        tempFile.deleteOnExit()
+        tempFile.writeText(
+            """
+            #+title: Work Notes
+            #+filetags: :agenda:
+
+            * TODO [#A] Task with pause and resume
+            """.trimIndent()
+        )
+
+        // 1. Clock in at 10:00
+        val t0 = RoamAgendaParser.parseOrgFile(tempFile)!![0]
+        val start1 = LocalDateTime.of(2026, 10, 15, 10, 0)
+        RoamAgendaParser.clockIn(t0, start1)
+
+        val t1 = RoamAgendaParser.parseOrgFile(tempFile)!![0]
+        assertTrue(t1.isClockedIn)
+        assertEquals(start1, t1.clockStartTime)
+
+        // 2. Pause at 10:15 (clocks out first interval: 15 min)
+        val pauseTime = LocalDateTime.of(2026, 10, 15, 10, 15)
+        RoamAgendaParser.clockOut(t1, pauseTime)
+
+        val t2 = RoamAgendaParser.parseOrgFile(tempFile)!![0]
+        org.junit.Assert.assertFalse(t2.isClockedIn)
+        assertEquals(15L, t2.totalClockedMinutes)
+
+        // 3. Resume at 10:30 (clocks in second interval)
+        val resumeTime = LocalDateTime.of(2026, 10, 15, 10, 30)
+        RoamAgendaParser.clockIn(t2, resumeTime)
+
+        val t3 = RoamAgendaParser.parseOrgFile(tempFile)!![0]
+        assertTrue(t3.isClockedIn)
+        assertEquals(resumeTime, t3.clockStartTime)
+        assertEquals(15L, t3.totalClockedMinutes)
+
+        // 4. Final clock out at 10:45 (another 15 min, total 30 min)
+        val stopTime = LocalDateTime.of(2026, 10, 15, 10, 45)
+        RoamAgendaParser.clockOut(t3, stopTime)
+
+        val t4 = RoamAgendaParser.parseOrgFile(tempFile)!![0]
+        org.junit.Assert.assertFalse(t4.isClockedIn)
+        assertEquals(30L, t4.totalClockedMinutes)
+
+        val finalContent = tempFile.readText()
+        assertTrue(finalContent.contains("CLOCK: [2026-10-15 Thu 10:00]--[2026-10-15 Thu 10:15] =>  0:15"))
+        assertTrue(finalContent.contains("CLOCK: [2026-10-15 Thu 10:30]--[2026-10-15 Thu 10:45] =>  0:15"))
     }
 }
